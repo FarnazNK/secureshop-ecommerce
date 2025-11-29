@@ -1,11 +1,11 @@
-# 🛒 SecureShop - Enterprise E-Commerce Platform
+#  SecureShop - Enterprise E-Commerce Platform
 
 [![Security](https://img.shields.io/badge/Security-OWASP%20Top%2010-green)](https://owasp.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
 
 A production-ready, security-first e-commerce platform built with modern technologies. Designed as a portfolio project demonstrating senior full-stack development expertise.
 
-## 🔐 Security Features
+## Security Features
 
 This project implements comprehensive security measures following OWASP guidelines:
 
@@ -40,7 +40,7 @@ This project implements comprehensive security measures following OWASP guidelin
 - **Environment variable management** - No secrets in code
 - **Dependency scanning** - npm audit integration
 
-## 🏗️ Architecture
+##  Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -80,7 +80,7 @@ This project implements comprehensive security measures following OWASP guidelin
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 - Node.js 20.x LTS
@@ -148,7 +148,7 @@ RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=100
 ```
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 secureshop/
@@ -176,7 +176,7 @@ secureshop/
 └── scripts/                  # Build/deploy scripts
 ```
 
-## 🔧 API Endpoints
+##  API Endpoints
 
 ### Authentication
 | Method | Endpoint | Description |
@@ -208,7 +208,7 @@ secureshop/
 | GET | `/api/v1/orders` | List user orders |
 | GET | `/api/v1/orders/:id` | Get order details |
 
-## 🧪 Testing
+##  Testing
 
 ```bash
 # Run all tests
@@ -224,7 +224,7 @@ npm run test:security
 npm run test:e2e
 ```
 
-## 🔒 Security Checklist
+##  Security Checklist
 
 Before deploying to production, ensure:
 
@@ -239,7 +239,7 @@ Before deploying to production, ensure:
 - [ ] Logging doesn't include sensitive data
 - [ ] File uploads are validated and scanned
 
-## 📊 Performance Optimizations
+##  Performance Optimizations
 
 - Redis caching for frequently accessed data
 - Database query optimization with indexes
@@ -251,7 +251,7 @@ Before deploying to production, ensure:
 
 
 
-## 👨‍💻 Author
+##  Author
 
 **Farnaz Nasehi**
 
