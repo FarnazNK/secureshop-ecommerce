@@ -1,7 +1,6 @@
 # 🛒 SecureShop - Enterprise E-Commerce Platform
 
 [![Security](https://img.shields.io/badge/Security-OWASP%20Top%2010-green)](https://owasp.org/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
 
 A production-ready, security-first e-commerce platform built with modern technologies. Designed as a portfolio project demonstrating senior full-stack development expertise.
@@ -248,25 +247,13 @@ Before deploying to production, ensure:
 - Code splitting and lazy loading
 - Service worker for offline support
 
-## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
-### Security Vulnerabilities
 
-Please report security vulnerabilities privately to security@example.com. Do not open public issues for security concerns.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 👨‍💻 Author
 
-**Senior Full Stack Developer Portfolio Project**
+**Farnaz Nasehi**
 
 Demonstrating expertise in:
 - Secure application architecture
@@ -274,7 +261,3 @@ Demonstrating expertise in:
 - RESTful API design
 - Database design and optimization
 - DevOps and deployment strategies
-
----
-
-⭐ Star this repo if you find it helpful!
