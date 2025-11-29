@@ -1,0 +1,405 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Playfair+Display:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =============================================================================
+   CSS Custom Properties - Design Tokens
+   ============================================================================= */
+
+:root {
+  /* Colors */
+  --color-bg-primary: 253 252 251;
+  --color-bg-secondary: 249 247 244;
+  --color-bg-tertiary: 243 239 233;
+  
+  --color-text-primary: 38 38 38;
+  --color-text-secondary: 109 109 109;
+  --color-text-muted: 136 136 136;
+  
+  --color-accent: 232 111 66;
+  --color-accent-hover: 212 84 40;
+  
+  --color-border: 228 226 217;
+  --color-border-hover: 212 203 192;
+  
+  /* Spacing */
+  --space-page-x: clamp(1rem, 5vw, 4rem);
+  --space-section-y: clamp(3rem, 8vw, 6rem);
+  
+  /* Typography */
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, monospace;
+  
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms ease;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(38, 38, 38, 0.04);
+  --shadow-md: 0 4px 12px rgba(38, 38, 38, 0.08);
+  --shadow-lg: 0 8px 24px rgba(38, 38, 38, 0.12);
+}
+
+/* =============================================================================
+   Base Styles
+   ============================================================================= */
+
+@layer base {
+  html {
+    @apply antialiased;
+    font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-sand-50 text-ink-900 font-body;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  /* Typography hierarchy */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-medium text-ink-900;
+    text-wrap: balance;
+  }
+
+  h1 {
+    @apply text-display-lg md:text-display-xl;
+  }
+
+  h2 {
+    @apply text-display-md md:text-display-lg;
+  }
+
+  h3 {
+    @apply text-display-sm md:text-display-md;
+  }
+
+  p {
+    @apply text-body-md text-ink-700;
+    text-wrap: pretty;
+  }
+
+  /* Links */
+  a {
+    @apply text-ink-900 transition-colors duration-200;
+  }
+
+  a:hover {
+    @apply text-primary-600;
+  }
+
+  /* Selection */
+  ::selection {
+    @apply bg-primary-200 text-ink-900;
+  }
+
+  /* Focus states - accessibility */
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2 ring-offset-sand-50;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-sand-100;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-sand-400 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-sand-500;
+  }
+}
+
+/* =============================================================================
+   Component Styles
+   ============================================================================= */
+
+@layer components {
+  /* Container */
+  .container-page {
+    @apply mx-auto w-full max-w-7xl;
+    padding-left: var(--space-page-x);
+    padding-right: var(--space-page-x);
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2;
+    @apply font-body font-medium text-body-sm;
+    @apply px-6 py-3 rounded-soft;
+    @apply transition-all duration-200;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2;
+  }
+
+  .btn-primary {
+    @apply btn;
+    @apply bg-ink-900 text-sand-50;
+    @apply hover:bg-ink-800 active:bg-ink-950;
+  }
+
+  .btn-secondary {
+    @apply btn;
+    @apply bg-sand-100 text-ink-900 border border-sand-300;
+    @apply hover:bg-sand-200 hover:border-sand-400;
+  }
+
+  .btn-accent {
+    @apply btn;
+    @apply bg-primary-500 text-white;
+    @apply hover:bg-primary-600 active:bg-primary-700;
+  }
+
+  .btn-ghost {
+    @apply btn;
+    @apply bg-transparent text-ink-700;
+    @apply hover:bg-sand-100 hover:text-ink-900;
+  }
+
+  .btn-icon {
+    @apply inline-flex items-center justify-center;
+    @apply w-10 h-10 rounded-soft;
+    @apply transition-all duration-200;
+    @apply hover:bg-sand-100;
+  }
+
+  /* Cards */
+  .card {
+    @apply bg-white rounded-card;
+    @apply border border-sand-200;
+    @apply shadow-card;
+    @apply transition-all duration-300;
+  }
+
+  .card-hover:hover {
+    @apply shadow-card-hover border-sand-300;
+    transform: translateY(-2px);
+  }
+
+  .card-interactive {
+    @apply card cursor-pointer;
+  }
+
+  .card-interactive:hover {
+    @apply shadow-card-hover border-sand-300;
+    transform: translateY(-2px);
+  }
+
+  /* Product card specific */
+  .product-card {
+    @apply card-interactive overflow-hidden;
+  }
+
+  .product-card-image {
+    @apply aspect-product bg-sand-100 overflow-hidden;
+  }
+
+  .product-card-image img {
+    @apply w-full h-full object-cover;
+    @apply transition-transform duration-500;
+  }
+
+  .product-card:hover .product-card-image img {
+    transform: scale(1.05);
+  }
+
+  /* Input fields */
+  .input {
+    @apply w-full px-4 py-3;
+    @apply bg-white border border-sand-300 rounded-soft;
+    @apply text-body-md text-ink-900 placeholder:text-ink-400;
+    @apply transition-all duration-200;
+    @apply focus:border-ink-500 focus:ring-1 focus:ring-ink-500;
+  }
+
+  .input-error {
+    @apply border-red-400 focus:border-red-500 focus:ring-red-500;
+  }
+
+  .input-label {
+    @apply block text-body-sm font-medium text-ink-700 mb-2;
+  }
+
+  .input-helper {
+    @apply text-body-xs text-ink-500 mt-1;
+  }
+
+  .input-error-message {
+    @apply text-body-xs text-red-600 mt-1;
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center;
+    @apply px-2.5 py-0.5 rounded-full;
+    @apply text-body-xs font-medium;
+  }
+
+  .badge-primary {
+    @apply badge bg-primary-100 text-primary-700;
+  }
+
+  .badge-success {
+    @apply badge bg-sage-400/20 text-sage-600;
+  }
+
+  .badge-warning {
+    @apply badge bg-amber-100 text-amber-700;
+  }
+
+  .badge-neutral {
+    @apply badge bg-sand-200 text-ink-600;
+  }
+
+  /* Divider */
+  .divider {
+    @apply h-px bg-sand-200;
+  }
+
+  .divider-vertical {
+    @apply w-px bg-sand-200;
+  }
+
+  /* Price display */
+  .price {
+    @apply font-mono font-medium text-ink-900;
+  }
+
+  .price-original {
+    @apply font-mono text-ink-400 line-through;
+  }
+
+  .price-sale {
+    @apply font-mono font-medium text-primary-600;
+  }
+
+  /* Section spacing */
+  .section {
+    padding-top: var(--space-section-y);
+    padding-bottom: var(--space-section-y);
+  }
+
+  /* Grid layouts */
+  .product-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6;
+  }
+
+  /* Skeleton loading */
+  .skeleton {
+    @apply bg-sand-200 rounded animate-pulse;
+  }
+
+  .skeleton-text {
+    @apply skeleton h-4 rounded;
+  }
+
+  .skeleton-title {
+    @apply skeleton h-6 rounded;
+  }
+
+  /* Toast notifications */
+  .toast {
+    @apply bg-white rounded-card shadow-elevated;
+    @apply border border-sand-200;
+    @apply p-4;
+  }
+
+  /* Modal/Dialog backdrop */
+  .backdrop {
+    @apply fixed inset-0 bg-ink-900/40 backdrop-blur-sm;
+  }
+
+  /* Navigation */
+  .nav-link {
+    @apply text-body-sm text-ink-600 font-medium;
+    @apply transition-colors duration-200;
+    @apply hover:text-ink-900;
+  }
+
+  .nav-link-active {
+    @apply text-ink-900;
+  }
+
+  /* Quantity selector */
+  .quantity-selector {
+    @apply inline-flex items-center border border-sand-300 rounded-soft overflow-hidden;
+  }
+
+  .quantity-btn {
+    @apply w-10 h-10 flex items-center justify-center;
+    @apply text-ink-600 hover:bg-sand-100 hover:text-ink-900;
+    @apply transition-colors duration-200;
+  }
+
+  .quantity-input {
+    @apply w-14 h-10 text-center border-0;
+    @apply text-body-md text-ink-900;
+    @apply focus:ring-0;
+  }
+}
+
+/* =============================================================================
+   Utility Classes
+   ============================================================================= */
+
+@layer utilities {
+  /* Text utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary-500 to-primary-700;
+  }
+
+  /* Grain texture overlay */
+  .grain-overlay {
+    @apply pointer-events-none;
+  }
+
+  .grain-overlay::after {
+    content: '';
+    @apply absolute inset-0 opacity-[0.03];
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Aspect ratios */
+  .aspect-product {
+    aspect-ratio: 4 / 5;
+  }
+
+  /* Animation delays */
+  .animation-delay-100 { animation-delay: 100ms; }
+  .animation-delay-200 { animation-delay: 200ms; }
+  .animation-delay-300 { animation-delay: 300ms; }
+  .animation-delay-400 { animation-delay: 400ms; }
+  .animation-delay-500 { animation-delay: 500ms; }
+}

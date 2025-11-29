@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Environment files (NEVER commit secrets)
+.env
+.env.local
+.env.production
+
+# Build outputs
+dist/
+build/
+
+# Database
+*.db
+*.sqlite
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Prisma
+backend/prisma/migrations/**/migration_lock.toml
+
+# Test coverage
+coverage/
