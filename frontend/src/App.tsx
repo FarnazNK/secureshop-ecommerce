@@ -18,6 +18,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { AccountPage } from './pages/AccountPage';
 import { OrdersPage } from './pages/OrdersPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { SkillsPage } from './pages/SkillsPage';
 
 // Protected Route wrapper
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -48,6 +49,7 @@ export default function App() {
                 <Route path="/cart" element={<CartPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                <Route path="/skills" element={<SkillsPage />} />
 
                 {/* Protected routes */}
                 <Route

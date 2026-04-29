@@ -110,5 +110,3 @@ export function Toaster() {
   );
 }
 
-// Re-export for convenience - wrap App with ToastProvider
-export { ToastProvider };
