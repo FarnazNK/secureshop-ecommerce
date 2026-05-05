@@ -1,0 +1,148 @@
+# docker-compose for local development and demo deployments.
+#
+# Brings up the full stack: postgres + redis + backend (Express) + frontend
+# (Vite build served by nginx, with /api reverse-proxied to backend).
+#
+# Quickstart:
+#   cp .env.example .env   # then fill in real values
+#   docker compose up --build
+#   open http://localhost:8080
+
+services:
+  # ---------------------------------------------------------------------------
+  # Database — Postgres 16 with health check so dependent services wait for it.
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: secureshop-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-secureshop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-secureshop}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Exposed on the host for psql / Prisma Studio access during dev.
+      # Comment out in production deployments — services talk over the
+      # internal docker network, no host exposure needed.
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-secureshop} -d $${POSTGRES_DB:-secureshop}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # Cache / session store — Redis 7 with persistence.
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: secureshop-redis
+    restart: unless-stopped
+    # `--appendonly yes` enables AOF persistence so cache survives restarts.
+    # If pure cache (no sessions) is fine, drop this for a smaller footprint.
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-}"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # Backend — Express API on port 3001.
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: secureshop-backend:local
+    container_name: secureshop-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      # Database — Prisma reads this URL.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-secureshop}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-secureshop}?schema=public
+      # Redis — sessions, rate-limit counters, cache.
+      REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379
+      # Auth secrets. Required — fail fast at startup if missing.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      COOKIE_SECRET: ${COOKIE_SECRET:?COOKIE_SECRET is required}
+      # Stripe (optional in dev — payment routes will return 503 without it).
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # CORS — must include the public frontend origin.
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+      # Email (optional — contact / verification will no-op without these).
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # Frontend — Vite-built static bundle served by nginx on port 8080.
+  # nginx reverse-proxies /api/* to the backend service.
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Bake the API URL into the build. For local compose, the bundle
+        # talks to /api which nginx proxies to the backend container.
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    image: secureshop-frontend:local
+    container_name: secureshop-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # One-shot DB migration runner. Doesn't start with `docker compose up` —
+  # invoke explicitly:  docker compose run --rm migrate
+  # ---------------------------------------------------------------------------
+  migrate:
+    image: secureshop-backend:local
+    container_name: secureshop-migrate
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-secureshop}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-secureshop}?schema=public
+    # Override the default CMD to run migrations instead of starting the server.
+    # `prisma migrate deploy` is the production-safe version (no schema diff
+    # generation, applies pending migrations only).
+    entrypoint: []
+    command: ["npx", "prisma", "migrate", "deploy"]
+
+volumes:
+  postgres_data:
+  redis_data:
