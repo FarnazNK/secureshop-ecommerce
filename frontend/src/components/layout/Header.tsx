@@ -8,7 +8,6 @@ import {
   Menu,
   X,
   Heart,
-  ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';

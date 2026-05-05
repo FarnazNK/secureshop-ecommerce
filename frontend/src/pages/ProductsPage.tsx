@@ -10,7 +10,7 @@ interface Product {
   shortDescription?: string;
   price: number;
   compareAtPrice?: number;
-  images?: { url: string; alt?: string }[];
+  images: { url: string; alt?: string }[];
   category?: { id: string; name: string; slug: string };
   isFeatured: boolean;
 }
