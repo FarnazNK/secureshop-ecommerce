@@ -1,7 +1,9 @@
 #  SecureShop - Enterprise E-Commerce Platform
 
+[![ci](https://github.com/FarnazNK/secureshop-ecommerce/actions/workflows/ci.yml/badge.svg)](https://github.com/FarnazNK/secureshop-ecommerce/actions)
 [![Security](https://img.shields.io/badge/Security-OWASP%20Top%2010-green)](https://owasp.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#run-with-docker-recommended-for-demo--production-like-setup)
 
 A production-ready, security-first e-commerce platform built with modern technologies. Designed as a portfolio project demonstrating senior full-stack development expertise.
 
@@ -110,6 +112,39 @@ npm run db:seed
 
 # Start development servers
 npm run dev
+```
+
+### Run with Docker (recommended for demo / production-like setup)
+
+The repo ships with multi-stage Dockerfiles for both backend and frontend,
+plus a docker-compose stack with Postgres and Redis baked in.
+
+```bash
+# Copy and fill in the root .env (compose reads it for service config)
+cp .env.example .env
+# Edit .env — generate JWT secrets with:  openssl rand -base64 48
+
+# Build and start everything
+docker compose up --build
+
+# In another terminal, apply DB migrations once
+docker compose run --rm migrate
+
+# App is now at:
+#   http://localhost:8080      — frontend (nginx serving the React SPA)
+#   http://localhost:3001/health — backend health check
+#   http://localhost:5432      — postgres (for psql / Prisma Studio)
+#   http://localhost:6379      — redis
+```
+
+The frontend container reverse-proxies `/api/*` requests to the backend,
+so the React app talks to a single origin in production. Both images run
+as non-root users with healthchecks wired in.
+
+To tear everything down (including volumes, which wipes the DB):
+
+```bash
+docker compose down -v
 ```
 
 ### Environment Variables
