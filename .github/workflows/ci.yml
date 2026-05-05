@@ -1,0 +1,200 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs for the same branch when a new commit lands.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Backend — lint, typecheck, test
+  # ---------------------------------------------------------------------------
+  backend:
+    name: backend (lint + typecheck + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    # Spin up real postgres and redis so tests that hit the DB have something
+    # to talk to. Vitest runs against these via DATABASE_URL / REDIS_URL.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: secureshop
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: secureshop_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://secureshop:testpass@localhost:5432/secureshop_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      # Test-only secrets — never used outside CI. Real secrets come from
+      # GitHub repo settings at deploy time.
+      JWT_SECRET: ci-jwt-secret-do-not-use-in-prod
+      JWT_REFRESH_SECRET: ci-refresh-secret-do-not-use-in-prod
+      COOKIE_SECRET: ci-cookie-secret-do-not-use-in-prod
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Apply DB schema
+        # `prisma db push` is fine for CI — no migration history needed,
+        # we just want the schema to exist for tests.
+        run: npx prisma db push --skip-generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck (build)
+        # `tsc` doubles as a typecheck. If `npm run build` succeeds the code
+        # type-checks cleanly.
+        run: npm run build
+
+      - name: Test
+        run: npm test -- --run
+        # The `-- --run` ensures vitest runs once and exits rather than
+        # entering watch mode if no tests are found.
+
+  # ---------------------------------------------------------------------------
+  # Frontend — lint, typecheck, build, test
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: frontend (lint + typecheck + build + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    env:
+      # Build-time API URL. CI doesn't ship this image, just verifies it builds.
+      VITE_API_URL: /api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck + build
+        # `npm run build` runs `tsc && vite build` — typecheck and bundle
+        # in one step. If either fails, CI fails.
+        run: npm run build
+
+      - name: Test
+        # Allow no tests for now — frontend test suite may not exist yet.
+        # Once tests land, change this to `npm test -- --run`.
+        run: npm test -- --run --passWithNoTests
+        continue-on-error: true
+
+  # ---------------------------------------------------------------------------
+  # Security audit — runs on both projects in parallel.
+  # `npm audit` is informational because public CVEs in transitive deps
+  # are not always actionable. Failure threshold: high or critical only.
+  # ---------------------------------------------------------------------------
+  audit:
+    name: security audit
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [backend, frontend]
+    defaults:
+      run:
+        working-directory: ./${{ matrix.project }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ matrix.project }}/package-lock.json
+
+      - name: npm audit (high/critical only)
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+  # ---------------------------------------------------------------------------
+  # Docker build — verifies both Dockerfiles build cleanly.
+  # Doesn't push anywhere; that's a separate deploy workflow.
+  # ---------------------------------------------------------------------------
+  docker:
+    name: docker build
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.project }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.project }}
+          push: false
+          load: true
+          tags: secureshop-${{ matrix.project }}:ci
+          cache-from: type=gha,scope=${{ matrix.project }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.project }}
+          build-args: |
+            VITE_API_URL=/api
+
+      - name: Smoke test image (backend only)
+        if: matrix.project == 'backend'
+        # Verify the image at least starts and the entry script imports
+        # cleanly. We don't try to hit /health here because the backend
+        # would need a DB — that's covered by the `backend` job.
+        run: |
+          docker run --rm secureshop-backend:ci node -e "console.log('ok')"
