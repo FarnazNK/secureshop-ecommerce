@@ -318,7 +318,7 @@ export function HomePage() {
                   ))}
                 </div>
                 <blockquote className="text-body-lg text-sand-200 mb-6">
-                  "{testimonial.content}"
+                  &quot;{testimonial.content}&quot;
                 </blockquote>
                 <div>
                   <p className="font-medium text-sand-50">{testimonial.author}</p>

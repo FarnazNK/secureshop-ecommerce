@@ -25,7 +25,7 @@ export function NotFoundPage() {
           Page Not Found
         </h1>
         <p className="text-ink-600 text-lg mb-8">
-          Oops! The page you're looking for doesn't exist. It might have been moved or deleted.
+          Oops! The page you&apos;re looking for doesn&apos;t exist. It might have been moved or deleted.
         </p>
 
         {/* Actions */}

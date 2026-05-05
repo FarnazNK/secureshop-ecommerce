@@ -83,7 +83,7 @@ export function CartPage() {
           </div>
           <h1 className="text-display-md font-display text-ink-900 mb-4">Your Cart is Empty</h1>
           <p className="text-ink-600 mb-8 max-w-md mx-auto">
-            Looks like you haven't added anything to your cart yet. Start shopping to fill it up!
+            Looks like you haven&apos;t added anything to your cart yet. Start shopping to fill it up!
           </p>
           <Link to="/products" className="btn-primary">
             Start Shopping

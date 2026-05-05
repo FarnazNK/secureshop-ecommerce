@@ -83,7 +83,7 @@ function formatZodError(error: ZodError): Record<string, string[]> {
  */
 function handlePrismaError(error: Prisma.PrismaClientKnownRequestError): AppError {
   switch (error.code) {
-    case 'P2002':
+case 'P2002': {
       // Unique constraint violation
       const field = (error.meta?.target as string[])?.join(', ') || 'field';
       return new AppError(
@@ -92,7 +92,7 @@ function handlePrismaError(error: Prisma.PrismaClientKnownRequestError): AppErro
         'DUPLICATE_ENTRY',
         true
       );
-    
+    }
     case 'P2025':
       // Record not found
       return new AppError('Record not found', 404, 'NOT_FOUND', true);
