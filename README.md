@@ -1,298 +1,268 @@
-#  SecureShop - Enterprise E-Commerce Platform
+# SecureShop — Secure E-Commerce Platform (FastAPI Edition)
 
 [![ci](https://github.com/FarnazNK/secureshop-ecommerce/actions/workflows/ci.yml/badge.svg)](https://github.com/FarnazNK/secureshop-ecommerce/actions)
+[![python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi)](https://fastapi.tiangolo.com)
 [![Security](https://img.shields.io/badge/Security-OWASP%20Top%2010-green)](https://owasp.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
-[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#run-with-docker-recommended-for-demo--production-like-setup)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#run-with-docker)
 
-A production-ready, security-first e-commerce platform built with modern technologies. Designed as a portfolio project demonstrating senior full-stack development expertise.
+A production-style e-commerce platform with a Python/FastAPI backend, a
+React/TypeScript frontend, and a security model aligned with the OWASP
+Top 10. Built as a portfolio piece demonstrating end-to-end secure
+full-stack patterns with a strong AI/Python backend stack.
 
-## Security Features
+> **Note:** This is a portfolio project. Schema, products, and demo data
+> are synthetic.
 
-This project implements comprehensive security measures following OWASP guidelines:
+---
 
-### Authentication & Authorization
-- **JWT with HTTP-only cookies** - Prevents XSS token theft
-- **Refresh token rotation** - Mitigates token replay attacks
-- **bcrypt password hashing** - Industry-standard password security (cost factor 12)
-- **Role-based access control (RBAC)** - Granular permission management
-- **Account lockout** - Brute force protection after failed attempts
+## Stack
 
-### Input Validation & Sanitization
-- **Server-side validation** - Using Joi/Zod schemas
-- **Input sanitization** - XSS prevention with DOMPurify
-- **Parameterized queries** - SQL injection prevention
-- **File upload validation** - Type, size, and content verification
+**Backend (Python)**
+- FastAPI 0.115+ with async route handlers
+- SQLAlchemy 2.0 async ORM over PostgreSQL (asyncpg driver)
+- Alembic for schema migrations
+- Redis for sessions and rate-limit counters
+- Pydantic v2 for request/response validation
+- python-jose + bcrypt for JWT and password hashing
+- slowapi for rate limiting
+- structlog for JSON-structured logging in production
 
-### API Security
-- **Rate limiting** - Prevents abuse and DDoS
-- **CORS configuration** - Strict origin policies
-- **Helmet.js** - Security headers (CSP, HSTS, etc.)
-- **Request size limits** - Prevents payload attacks
+**Frontend (TypeScript)**
+- React 18 + Vite + TypeScript
+- Tailwind CSS, React Router, React Query
+- nginx in production (reverse-proxies `/api/*` to the backend)
 
-### Data Protection
-- **Encryption at rest** - Sensitive data encryption
-- **PCI DSS considerations** - No card storage, Stripe integration
-- **GDPR compliance patterns** - Data export/deletion capabilities
-- **Audit logging** - Security event tracking
+**Infrastructure**
+- PostgreSQL 16, Redis 7
+- Multi-stage Dockerfiles for both services (non-root, healthchecks)
+- docker-compose stack with persistent volumes
+- GitHub Actions CI: lint, format check, tests against live Postgres/Redis,
+  Docker build matrix
 
-### Additional Protections
-- **CSRF tokens** - Cross-site request forgery prevention
-- **Secure session management** - Redis-backed sessions
-- **Environment variable management** - No secrets in code
-- **Dependency scanning** - npm audit integration
+---
 
-##  Architecture
+## Security features
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Client Layer                            │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │   React     │  │   Redux     │  │   React Query           │  │
-│  │   18.x      │  │   Toolkit   │  │   (Server State)        │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              │ HTTPS (TLS 1.3)
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        API Gateway                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │   Rate      │  │   Auth      │  │   Request               │  │
-│  │   Limiter   │  │   Guard     │  │   Validator             │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Application Layer                          │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │   Express   │  │   Business  │  │   Service               │  │
-│  │   Server    │  │   Logic     │  │   Layer                 │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        Data Layer                               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │ PostgreSQL  │  │   Redis     │  │   S3/CloudStorage       │  │
-│  │ (Primary)   │  │   (Cache)   │  │   (Assets)              │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
+Built around the OWASP Top 10 and standard defense-in-depth patterns:
 
-##  Quick Start
+**Authentication & authorization**
+- JWT access + refresh tokens with **distinct signing secrets** per type
+- Refresh tokens stored in **HTTP-only, SameSite cookies**
+- **Refresh-token rotation with reuse detection** — presenting a revoked
+  token invalidates every active session for that user
+- bcrypt password hashing (cost 12, configurable)
+- **Constant-time login response** — bcrypt is run even on missing users
+  to prevent timing-based email enumeration
+- Account lockout after configurable failed-attempt threshold
+- Strict password policy (min length + char-class requirements)
+- Role-based access control with declarative `require_role(...)` dependency
 
-### Prerequisites
-- Node.js 20.x LTS
-- PostgreSQL 15+
-- Redis 7+
-- npm or yarn
+**API hardening**
+- Custom security-headers middleware: CSP, HSTS in prod, X-Frame-Options,
+  X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+- CORS with explicit allowed origins (no `*` with credentials)
+- Per-IP rate limiting via slowapi, tighter on auth endpoints
+- TrustedHostMiddleware in production
+- Pydantic v2 validation on every request body, query, and path param
+- Centralized exception handler that never leaks stack traces to clients
+- Per-request structured logging with request-ID propagation
 
-### Installation
+**Data layer**
+- Parameterized queries everywhere via SQLAlchemy
+- Money modeled as `Numeric(10, 2)` — never `Float`
+- Order items are price/name **snapshots** at order time so receipts stay
+  accurate even if the catalog changes
+- No card data ever touches the database — Stripe Elements handles PCI scope
+
+---
+
+## Quickstart
+
+### Run with Docker
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/secureshop.git
-cd secureshop
-
-# Install dependencies
-npm run install:all
-
-# Setup environment variables
+# 1. Copy env template and fill in real secrets
 cp .env.example .env
-# Edit .env with your configuration
+# Generate each secret with: openssl rand -base64 48
 
-# Run database migrations
-npm run db:migrate
-
-# Seed demo data (development only)
-npm run db:seed
-
-# Start development servers
-npm run dev
-```
-
-### Run with Docker (recommended for demo / production-like setup)
-
-The repo ships with multi-stage Dockerfiles for both backend and frontend,
-plus a docker-compose stack with Postgres and Redis baked in.
-
-```bash
-# Copy and fill in the root .env (compose reads it for service config)
-cp .env.example .env
-# Edit .env — generate JWT secrets with:  openssl rand -base64 48
-
-# Build and start everything
+# 2. Build and start the stack (postgres + redis + backend + frontend)
 docker compose up --build
 
-# In another terminal, apply DB migrations once
+# 3. In another terminal, apply DB migrations once
 docker compose run --rm migrate
 
-# App is now at:
-#   http://localhost:8080      — frontend (nginx serving the React SPA)
-#   http://localhost:3001/health — backend health check
-#   http://localhost:5432      — postgres (for psql / Prisma Studio)
-#   http://localhost:6379      — redis
+# Access:
+#   http://localhost:8080         — frontend (React SPA)
+#   http://localhost:3001/api/docs — Swagger UI (dev only)
+#   http://localhost:3001/api/v1/health — health check
 ```
 
-The frontend container reverse-proxies `/api/*` requests to the backend,
-so the React app talks to a single origin in production. Both images run
-as non-root users with healthchecks wired in.
-
-To tear everything down (including volumes, which wipes the DB):
+Tear everything down (including DB volume):
 
 ```bash
 docker compose down -v
 ```
 
-### Environment Variables
+### Run backend locally (without Docker)
 
 ```bash
-# Server
-NODE_ENV=development
-PORT=3001
-API_VERSION=v1
+cd backend
+make dev          # install with dev extras
+cp .env.example .env
+# fill in DATABASE_URL, REDIS_URL, secrets
 
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/secureshop
-DATABASE_SSL=false
-
-# Redis
-REDIS_URL=redis://localhost:6379
-
-# JWT Secrets (generate with: openssl rand -base64 64)
-JWT_ACCESS_SECRET=your-access-secret-min-32-chars
-JWT_REFRESH_SECRET=your-refresh-secret-min-32-chars
-JWT_ACCESS_EXPIRY=15m
-JWT_REFRESH_EXPIRY=7d
-
-# Encryption
-ENCRYPTION_KEY=your-32-byte-encryption-key
-
-# Stripe (Test Keys)
-STRIPE_SECRET_KEY=sk_test_xxx
-STRIPE_WEBHOOK_SECRET=whsec_xxx
-
-# CORS
-ALLOWED_ORIGINS=http://localhost:3000
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
+make migrate      # apply schema
+make serve        # uvicorn --reload on :3001
+make test         # 23 unit tests
+make lint         # ruff check + format check
 ```
 
-##  Project Structure
+---
+
+## API surface
+
+OpenAPI / Swagger UI is auto-generated at `/api/docs` (dev only — disabled
+in production builds).
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET    | `/api/v1/health`              | —     | Liveness + DB reachability |
+| POST   | `/api/v1/auth/register`       | —     | Create account, set refresh cookie, return access token |
+| POST   | `/api/v1/auth/login`          | —     | Exchange credentials for tokens |
+| POST   | `/api/v1/auth/refresh`        | cookie | Rotate refresh token, mint new access token |
+| POST   | `/api/v1/auth/logout`         | cookie | Revoke current refresh token |
+| GET    | `/api/v1/auth/me`             | bearer | Current authenticated user |
+| GET    | `/api/v1/products`            | —     | List products (filters, pagination) |
+| GET    | `/api/v1/products/{id}`       | —     | Product detail |
+| POST   | `/api/v1/products`            | admin | Create product |
+| PATCH  | `/api/v1/products/{id}`       | admin | Update product |
+| DELETE | `/api/v1/products/{id}`       | admin | Delete product |
+| GET    | `/api/v1/cart`                | bearer | Current user's cart |
+| POST   | `/api/v1/cart/items`          | bearer | Add to cart |
+| PATCH  | `/api/v1/cart/items/{id}`     | bearer | Update item quantity |
+| DELETE | `/api/v1/cart/items/{id}`     | bearer | Remove item |
+| DELETE | `/api/v1/cart`                | bearer | Clear cart |
+| POST   | `/api/v1/orders`              | bearer | Create order from cart, returns Stripe client secret |
+| GET    | `/api/v1/orders`              | bearer | List user's orders |
+| GET    | `/api/v1/orders/{id}`         | bearer | Order detail |
+
+---
+
+## Project structure
 
 ```
-secureshop/
-├── frontend/                 # React application
+secureshop-fastapi/
+├── backend/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── deps.py              # FastAPI dependencies (current_user, require_role)
+│   │   │   └── v1/                  # Route handlers (thin)
+│   │   │       ├── auth.py
+│   │   │       ├── cart.py
+│   │   │       ├── health.py
+│   │   │       ├── orders.py
+│   │   │       └── products.py
+│   │   ├── core/
+│   │   │   ├── config.py            # pydantic-settings, required-secret validation
+│   │   │   ├── logging.py           # structlog setup (JSON in prod)
+│   │   │   └── security.py          # bcrypt + JWT primitives
+│   │   ├── db/
+│   │   │   ├── base.py              # declarative Base, mixins
+│   │   │   └── session.py           # async session, get_db dependency
+│   │   ├── middleware/
+│   │   │   ├── request_logging.py   # request-ID + structured access log
+│   │   │   └── security_headers.py  # CSP, HSTS, X-Frame-Options, etc.
+│   │   ├── models/                  # SQLAlchemy models (User, Product, Cart, Order, ...)
+│   │   ├── schemas/                 # Pydantic request/response models
+│   │   ├── services/
+│   │   │   └── auth_service.py      # business logic — login, register, refresh rotation
+│   │   └── main.py                  # FastAPI app factory
+│   ├── alembic/                     # migrations
+│   │   ├── env.py
+│   │   └── versions/
+│   │       └── 0001_initial.py
+│   ├── tests/                       # 23 unit tests (security, schemas, config)
+│   ├── Dockerfile                   # multi-stage, non-root, tini, healthcheck
+│   ├── Makefile                     # one-line entry points
+│   ├── alembic.ini
+│   └── pyproject.toml
+├── frontend/                        # React 18 + Vite + TypeScript SPA
 │   ├── src/
-│   │   ├── components/      # Reusable UI components
-│   │   ├── pages/           # Page components
-│   │   ├── hooks/           # Custom React hooks
-│   │   ├── context/         # React context providers
-│   │   ├── utils/           # Utility functions
-│   │   ├── types/           # TypeScript definitions
-│   │   └── styles/          # Global styles
-│   └── public/
-├── backend/                  # Express API server
-│   ├── src/
-│   │   ├── config/          # Configuration files
-│   │   ├── controllers/     # Route handlers
-│   │   ├── middleware/      # Express middleware
-│   │   ├── models/          # Database models
-│   │   ├── routes/          # API routes
-│   │   ├── utils/           # Helper functions
-│   │   └── validators/      # Input validation schemas
-│   └── tests/
-├── docs/                     # Documentation
-└── scripts/                  # Build/deploy scripts
+│   ├── Dockerfile                   # multi-stage Vite build → nginx
+│   └── nginx.conf                   # SPA fallback + /api reverse-proxy
+├── docker-compose.yml               # postgres + redis + backend + frontend + migrate
+├── .github/workflows/ci.yml         # lint, tests against live PG/Redis, docker build
+├── .env.example
+└── README.md
 ```
 
-##  API Endpoints
+---
 
-### Authentication
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/auth/register` | User registration |
-| POST | `/api/v1/auth/login` | User login |
-| POST | `/api/v1/auth/logout` | User logout |
-| POST | `/api/v1/auth/refresh` | Refresh access token |
-| POST | `/api/v1/auth/forgot-password` | Request password reset |
-| POST | `/api/v1/auth/reset-password` | Reset password |
+## Design decisions worth pointing at
 
-### Products
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/products` | List products (paginated) |
-| GET | `/api/v1/products/:id` | Get product details |
-| POST | `/api/v1/products` | Create product (admin) |
-| PUT | `/api/v1/products/:id` | Update product (admin) |
-| DELETE | `/api/v1/products/:id` | Delete product (admin) |
+**Schemas separate from models.** Pydantic schemas (`app/schemas/`) define
+the wire format; SQLAlchemy models (`app/models/`) define the database. The
+two evolve independently — a column rename doesn't have to break API clients.
 
-### Cart & Orders
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/cart` | Get user's cart |
-| POST | `/api/v1/cart/items` | Add item to cart |
-| PUT | `/api/v1/cart/items/:id` | Update cart item |
-| DELETE | `/api/v1/cart/items/:id` | Remove cart item |
-| POST | `/api/v1/orders` | Create order |
-| GET | `/api/v1/orders` | List user orders |
-| GET | `/api/v1/orders/:id` | Get order details |
+**Refresh-token reuse detection.** Every refresh token is persisted with a
+JTI. When a token is rotated, the old row's `revoked_at` is set. If a
+revoked token is ever presented again (a sign of theft), `_revoke_all_for_user`
+fires and invalidates every active session for that user.
 
-##  Testing
+**Constant-time login.** `verify_password` is run against a fixed dummy
+hash even when the user lookup misses. Without this, response timing
+distinguishes "no such user" from "wrong password" and enables email
+enumeration.
+
+**Order item snapshots.** `OrderItem` copies `product_name`, `product_slug`,
+and `unit_price` at order time. If a product is later renamed, repriced, or
+deleted, historical receipts stay correct.
+
+**Service layer.** Business logic lives in `app/services/`, not in route
+handlers. The handlers translate HTTP into service calls; this keeps the
+logic testable without spinning up an HTTP server.
+
+**Required-secret validation at boot.** The `Settings` class declares JWT
+and encryption secrets with `min_length=32` and no defaults. The app crashes
+at startup if any are missing — better than booting and silently using
+weak crypto.
+
+---
+
+## Testing
 
 ```bash
-# Run all tests
-npm test
-
-# Run with coverage
-npm run test:coverage
-
-# Run security tests
-npm run test:security
-
-# Run E2E tests
-npm run test:e2e
+cd backend
+make test
 ```
 
-##  Security Checklist
+23 unit tests covering:
+- Password hashing (round-trip, salt uniqueness, malformed-hash safety)
+- JWT (round-trip, type isolation, JTI uniqueness, tampering rejection)
+- Auth schema validation (password policy, email format, name trimming)
+- Settings parsing (CORS list, env-driven mode toggles)
 
-Before deploying to production, ensure:
+Tests run with no external dependencies — DB and Redis are not required
+for the unit suite. The `backend` CI job runs the full suite against a
+live Postgres + Redis pair via GitHub Actions services.
 
-- [ ] All secrets are in environment variables
-- [ ] HTTPS is enforced
-- [ ] Database connections use SSL
-- [ ] Rate limiting is configured
-- [ ] CORS is properly restricted
-- [ ] CSP headers are set
-- [ ] Dependencies are audited (`npm audit`)
-- [ ] Error messages don't leak sensitive info
-- [ ] Logging doesn't include sensitive data
-- [ ] File uploads are validated and scanned
+---
 
-##  Performance Optimizations
+## Production considerations not handled
 
-- Redis caching for frequently accessed data
-- Database query optimization with indexes
-- Image optimization and CDN delivery
-- Code splitting and lazy loading
-- Service worker for offline support
+- **HTTPS termination** — production should sit behind a load balancer
+  (ALB / nginx / Caddy) doing TLS termination and forwarding `X-Forwarded-*`.
+  `proxy-headers` is already enabled in the uvicorn command.
+- **Email delivery** — SMTP is wired in but not configured by default.
+  Verification and password reset emails will no-op until SMTP env vars are set.
+- **Stripe webhook handler** — payment intents are created server-side; the
+  webhook that flips orders to `PAID` status would land in a follow-up PR.
+- **Horizontal scaling** — current setup is single-process. For real prod,
+  run multiple uvicorn workers and ensure Redis is highly available.
+- **Secret management** — secrets come from env vars. Production should
+  pull from a secret manager (Vault, AWS Secrets Manager, GCP Secret Manager).
 
+---
 
-
-
-
-##  Author
-
-**Farnaz Nasehi**
-
-Demonstrating expertise in:
-- Secure application architecture
-- Modern React patterns and TypeScript
-- RESTful API design
-- Database design and optimization
-- DevOps and deployment strategies
+*Built by Farnaz Nasehi.*

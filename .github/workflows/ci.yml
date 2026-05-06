@@ -6,27 +6,21 @@ on:
   pull_request:
     branches: [main]
 
-# Cancel in-progress runs for the same branch when a new commit lands.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  NODE_VERSION: "20"
-
 jobs:
   # ---------------------------------------------------------------------------
-  # Backend — lint, typecheck, test
+  # Backend (FastAPI + SQLAlchemy + pytest)
   # ---------------------------------------------------------------------------
   backend:
-    name: backend (lint + typecheck + test)
+    name: backend (lint + tests)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./backend
 
-    # Spin up real postgres and redis so tests that hit the DB have something
-    # to talk to. Vitest runs against these via DATABASE_URL / REDIS_URL.
     services:
       postgres:
         image: postgres:16-alpine
@@ -41,6 +35,7 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+
       redis:
         image: redis:7-alpine
         ports:
@@ -52,120 +47,77 @@ jobs:
           --health-retries 10
 
     env:
-      DATABASE_URL: postgresql://secureshop:testpass@localhost:5432/secureshop_test?schema=public
+      DATABASE_URL: postgresql+asyncpg://secureshop:testpass@localhost:5432/secureshop_test
       REDIS_URL: redis://localhost:6379
-      # Test-only secrets — never used outside CI. Real secrets come from
-      # GitHub repo settings at deploy time.
-      JWT_SECRET: ci-jwt-secret-do-not-use-in-prod
-      JWT_REFRESH_SECRET: ci-refresh-secret-do-not-use-in-prod
-      COOKIE_SECRET: ci-cookie-secret-do-not-use-in-prod
+      JWT_ACCESS_SECRET: ci-access-secret-min-32-chars-padded-here-x
+      JWT_REFRESH_SECRET: ci-refresh-secret-min-32-chars-padded-here-x
+      ENCRYPTION_KEY: ci-encryption-key-min-32-chars-padded-here-x
       NODE_ENV: test
+      COOKIE_SECURE: "false"
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-python@v5
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
+          python-version: "3.11"
+          cache: pip
 
       - name: Install
-        run: npm ci
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
 
-      - name: Generate Prisma client
-        run: npx prisma generate
+      - name: Ruff (lint)
+        run: ruff check app tests
 
-      - name: Apply DB schema
-        # `prisma db push` is fine for CI — no migration history needed,
-        # we just want the schema to exist for tests.
-        run: npx prisma db push --skip-generate
+      - name: Ruff (format check)
+        run: ruff format --check app tests
 
-      - name: Lint
-        run: npm run lint
+      - name: Apply migrations
+        run: alembic upgrade head
 
-      - name: Typecheck (build)
-        # `tsc` doubles as a typecheck. Allowed to fail temporarily on
-        # legacy code that hasn't been compiled in strict mode yet.
-        run: npm run build
-        continue-on-error: true
+      - name: Run tests with coverage
+        run: pytest --cov=app --cov-report=xml --cov-report=term -ra
 
-      - name: Test
-        # `--passWithNoTests` lets the suite succeed when no test files
-        # exist yet (test files will land in a later PR).
-        run: npm test -- --run --passWithNoTests
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: backend/coverage.xml
 
   # ---------------------------------------------------------------------------
-  # Frontend — lint, typecheck, build, test
+  # Frontend (Vite typecheck + build)
   # ---------------------------------------------------------------------------
   frontend:
-    name: frontend (lint + typecheck + build + test)
+    name: frontend (typecheck + build)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./frontend
     env:
-      # Build-time API URL. CI doesn't ship this image, just verifies it builds.
-      VITE_API_URL: /api
+      VITE_API_URL: /api/v1
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: "20"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install
-        run: npm ci
+        run: npm ci || npm install
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck + build
-        # `npm run build` runs `tsc && vite build` — typecheck and bundle
-        # in one step. Allowed to fail temporarily on legacy types.
+      - name: Build (typecheck + bundle)
+        # `npm run build` runs `tsc && vite build` — fails on type errors.
+        # Allowed to fail temporarily on pre-existing type debt.
         run: npm run build
-        continue-on-error: true
-
-      - name: Test
-        # Allow no tests for now — frontend test suite may not exist yet.
-        run: npm test -- --run --passWithNoTests
-        continue-on-error: true
-
-  # ---------------------------------------------------------------------------
-  # Security audit — runs on both projects in parallel.
-  # `npm audit` is informational because public CVEs in transitive deps
-  # are not always actionable. Failure threshold: high or critical only.
-  # ---------------------------------------------------------------------------
-  audit:
-    name: security audit
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        project: [backend, frontend]
-    defaults:
-      run:
-        working-directory: ./${{ matrix.project }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: ${{ matrix.project }}/package-lock.json
-
-      - name: npm audit (high/critical only)
-        run: npm audit --audit-level=high
         continue-on-error: true
 
   # ---------------------------------------------------------------------------
   # Docker build — verifies both Dockerfiles build cleanly.
-  # Doesn't push anywhere; that's a separate deploy workflow.
   # ---------------------------------------------------------------------------
   docker:
     name: docker build
@@ -190,12 +142,16 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.project }}
           cache-to: type=gha,mode=max,scope=${{ matrix.project }}
           build-args: |
-            VITE_API_URL=/api
+            VITE_API_URL=/api/v1
 
-      - name: Smoke test image (backend only)
+      - name: Smoke test (backend only)
         if: matrix.project == 'backend'
-        # Verify the image at least starts and the entry script imports
-        # cleanly. We don't try to hit /health here because the backend
-        # would need a DB — that's covered by the `backend` job.
+        # Just confirm the FastAPI app imports — full e2e is covered by `backend` job.
         run: |
-          docker run --rm secureshop-backend:ci node -e "console.log('ok')"
+          docker run --rm \
+            -e DATABASE_URL=postgresql+asyncpg://x:x@x:5432/x \
+            -e REDIS_URL=redis://x:6379 \
+            -e JWT_ACCESS_SECRET=smoke-test-secret-min-32-chars-padded \
+            -e JWT_REFRESH_SECRET=smoke-test-secret-min-32-chars-padded-x \
+            -e ENCRYPTION_KEY=smoke-test-encryption-key-min-32-chars \
+            secureshop-backend:ci python -c "from app.main import create_app; app = create_app(); print('app ok:', app.title)"

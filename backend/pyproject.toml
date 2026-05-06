@@ -1,0 +1,93 @@
+[project]
+name = "secureshop-backend"
+version = "1.0.0"
+description = "Secure e-commerce API server (FastAPI)"
+requires-python = ">=3.11"
+dependencies = [
+    # Web framework
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+
+    # Database
+    "sqlalchemy>=2.0",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    "psycopg2-binary>=2.9",  # alembic sync driver
+
+    # Cache / sessions
+    "redis>=5.2",
+
+    # Auth + crypto
+    "python-jose[cryptography]>=3.3",
+    "passlib[bcrypt]>=1.7",
+    "bcrypt>=4.0,<5.0",  # passlib 1.7 doesn't support bcrypt 5.x yet
+    "python-multipart>=0.0.12",  # form parsing for OAuth2 password flow
+
+    # Security middleware
+    "slowapi>=0.1.9",
+    "secure>=1.0",
+
+    # Stripe
+    "stripe>=11.4",
+
+    # Email
+    "fastapi-mail>=1.4",
+
+    # Validation helpers
+    "email-validator>=2.2",
+    "bleach>=6.2",  # XSS sanitization for any HTML content
+
+    # Logging
+    "structlog>=24.4",
+
+    # HTTP client (for Stripe webhooks etc.)
+    "httpx>=0.28",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "httpx>=0.28",  # FastAPI test client
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "types-passlib",
+    "types-python-jose",
+    "types-redis",
+    "faker>=33.0",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+ignore = [
+    "B008",  # function call in default arg — required by FastAPI's Depends()
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["RUF059", "SIM117"]
+"alembic/**/*.py" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
