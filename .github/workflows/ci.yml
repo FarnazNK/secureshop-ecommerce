@@ -139,8 +139,8 @@ jobs:
           push: false
           load: true
           tags: secureshop-${{ matrix.project }}:ci
-          cache-from: type=gha,scope=${{ matrix.project }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.project }}
+cache-from: type=gha,scope=${{ matrix.project }}-py
+          cache-to: type=gha,mode=max,scope=${{ matrix.project }}-py
           build-args: |
             VITE_API_URL=/api/v1
 
