@@ -4,7 +4,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
 export function CartPage() {
-  const { cart, updateQuantity, removeItem, loading, clearCart } = useCart();
+  const { cart, updateItem, removeItem, isLoading, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set());
@@ -20,7 +20,7 @@ export function CartPage() {
     if (newQuantity < 1) return;
     setUpdatingItems((prev) => new Set(prev).add(itemId));
     try {
-      await updateQuantity(itemId, newQuantity);
+      await updateItem(itemId, newQuantity);
     } finally {
       setUpdatingItems((prev) => {
         const next = new Set(prev);
@@ -51,7 +51,7 @@ export function CartPage() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-sand-50 py-12">
         <div className="container-page">
@@ -83,7 +83,7 @@ export function CartPage() {
           </div>
           <h1 className="text-display-md font-display text-ink-900 mb-4">Your Cart is Empty</h1>
           <p className="text-ink-600 mb-8 max-w-md mx-auto">
-            Looks like you haven't added anything to your cart yet. Start shopping to fill it up!
+            Looks like you haven&apos;t added anything to your cart yet. Start shopping to fill it up!
           </p>
           <Link to="/products" className="btn-primary">
             Start Shopping

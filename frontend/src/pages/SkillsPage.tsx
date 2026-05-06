@@ -268,7 +268,7 @@ export function SkillsPage() {
                 Have a project in mind?
               </h2>
               <p className="text-body-xl text-sand-300 mb-8">
-                I'm always happy to talk shop, review architecture, or jump into
+                I&apos;m always happy to talk shop, review architecture, or jump into
                 interesting product work.
               </p>
               <Link

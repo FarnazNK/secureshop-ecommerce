@@ -224,7 +224,7 @@ export function LoginPage() {
 
           {/* Sign up link */}
           <p className="text-center text-body-md text-ink-600 mt-6">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link
               to="/register"
               className="text-primary-600 font-medium hover:text-primary-700"

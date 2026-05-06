@@ -1,0 +1,112 @@
+# docker-compose for the SecureShop FastAPI stack.
+#
+# Quickstart:
+#   cp .env.example .env       # then fill in real values
+#   docker compose up --build  # builds images, starts the full stack
+#   docker compose run --rm migrate   # apply DB migrations
+#   open http://localhost:8080
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: secureshop-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-secureshop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-secureshop}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-secureshop} -d $${POSTGRES_DB:-secureshop}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: secureshop-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: secureshop-backend:local
+    container_name: secureshop-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3001
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-secureshop}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-secureshop}
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8080}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3001/api/v1/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api/v1}
+    image: secureshop-frontend:local
+    container_name: secureshop-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  # One-shot Alembic migration runner.
+  # Usage:  docker compose run --rm migrate
+  migrate:
+    image: secureshop-backend:local
+    container_name: secureshop-migrate
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-secureshop}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-secureshop}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?}
+      REDIS_URL: redis://redis:6379
+    entrypoint: []
+    command: ["alembic", "upgrade", "head"]
+
+volumes:
+  postgres_data:
+  redis_data:
