@@ -18,6 +18,21 @@ interface User {
   emailVerified: boolean;
 }
 
+interface BackendUser {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  email_verified: boolean;
+}
+
+interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  user: BackendUser;
+}
+
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
@@ -37,21 +52,36 @@ interface RegisterData {
   acceptTerms: boolean;
 }
 
+const TOKEN_KEY = 'secureshop-access-token';
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function mapUser(user: BackendUser): User {
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: user.first_name,
+    lastName: user.last_name,
+    role: user.role,
+    emailVerified: user.email_verified,
+  };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Check auth status on mount
   useEffect(() => {
     const checkAuth = async () => {
+      if (!localStorage.getItem(TOKEN_KEY)) {
+        setIsLoading(false);
+        return;
+      }
       try {
-        const response = await api.get('/auth/me');
-        setUser(response.data.data.user);
+        const response = await api.get<BackendUser>('/auth/me');
+        setUser(mapUser(response.data));
       } catch {
-        // Not authenticated, that's okay
+        localStorage.removeItem(TOKEN_KEY);
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -62,29 +92,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(
-    async (email: string, password: string, rememberMe = false) => {
-      const response = await api.post('/auth/login', {
+    async (email: string, password: string, _rememberMe = false) => {
+      const response = await api.post<TokenResponse>('/auth/login', {
         email,
         password,
-        rememberMe,
       });
-
-      setUser(response.data.data.user);
+      localStorage.setItem(TOKEN_KEY, response.data.access_token);
+      setUser(mapUser(response.data.user));
     },
-    []
+    [],
   );
 
   const register = useCallback(async (data: RegisterData) => {
-    await api.post('/auth/register', data);
-    // After registration, user needs to verify email or login
+    const response = await api.post<TokenResponse>('/auth/register', {
+      email: data.email,
+      password: data.password,
+      first_name: data.firstName,
+      last_name: data.lastName,
+    });
+    localStorage.setItem(TOKEN_KEY, response.data.access_token);
+    setUser(mapUser(response.data.user));
   }, []);
 
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
     } catch {
-      // Continue with logout even if API fails
+      // Local logout still proceeds if the server is unavailable.
     } finally {
+      localStorage.removeItem(TOKEN_KEY);
       setUser(null);
       navigate('/');
     }
@@ -92,23 +128,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     try {
-      const response = await api.get('/auth/me');
-      setUser(response.data.data.user);
+      const response = await api.get<BackendUser>('/auth/me');
+      setUser(mapUser(response.data));
     } catch {
+      localStorage.removeItem(TOKEN_KEY);
       setUser(null);
     }
   }, []);
 
-  // Set up token refresh
   useEffect(() => {
     if (!user) return;
 
-    // Refresh token before it expires (every 14 minutes for 15-minute tokens)
     const refreshInterval = setInterval(async () => {
       try {
-        await api.post('/auth/refresh');
+        const response = await api.post<TokenResponse>('/auth/refresh', {});
+        localStorage.setItem(TOKEN_KEY, response.data.access_token);
+        setUser(mapUser(response.data.user));
       } catch {
-        // If refresh fails, log out
+        localStorage.removeItem(TOKEN_KEY);
         setUser(null);
       }
     }, 14 * 60 * 1000);
