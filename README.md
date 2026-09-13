@@ -13,6 +13,9 @@ full-stack patterns with a strong AI/Python backend stack.
 
 > **Note:** This is a portfolio project. Schema, products, and demo data
 > are synthetic.
+>
+> **Live demo:** <https://secureshop-l35h.onrender.com>  
+> **Public API:** <https://secureshop-api-zckt.onrender.com/api/v1/health>
 
 ## Live deployment
 
@@ -25,6 +28,16 @@ FastAPI service, managed Neon PostgreSQL, and a Render Key Value service. Stripe
 live payments and email delivery are not enabled for the portfolio demo.
 
 ---
+
+## Public deployment
+
+- **Storefront:** <https://secureshop-l35h.onrender.com>
+- **API health:** <https://secureshop-api-zckt.onrender.com/api/v1/health>
+
+The portfolio deployment uses a Render static frontend, a Render FastAPI service,
+and Neon PostgreSQL. Alembic applies the schema and seeds a small synthetic demo
+catalog. Stripe remains optional/test-oriented; no real card data is stored by
+the application.
 
 ## Stack
 
@@ -44,7 +57,7 @@ live payments and email delivery are not enabled for the portfolio demo.
 - nginx in production (reverse-proxies `/api/*` to the backend)
 
 **Infrastructure**
-- PostgreSQL 16, Redis 7
+- PostgreSQL 16 plus Redis 7-compatible deployment scaffolding
 - Multi-stage Dockerfiles for both services (non-root, healthchecks)
 - docker-compose stack with persistent volumes
 - GitHub Actions CI: lint, format check, tests against live Postgres/Redis,
@@ -270,8 +283,9 @@ backend image.
   Verification and password reset emails will no-op until SMTP env vars are set.
 - **Stripe webhook handler** — payment intents are created server-side; the
   webhook that flips orders to `PAID` status would land in a follow-up PR.
-- **Horizontal scaling** — current setup is single-process. For real prod,
-  run multiple uvicorn workers and ensure Redis is highly available.
+- **Horizontal scaling** — current setup is single-process and rate limiting is
+  process-local. For real prod, move distributed rate limiting/cache state to
+  Redis and run multiple uvicorn workers.
 - **Secret management** — secrets come from env vars. Production should
   pull from a secret manager (Vault, AWS Secrets Manager, GCP Secret Manager).
 
