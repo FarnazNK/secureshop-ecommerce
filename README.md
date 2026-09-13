@@ -14,6 +14,16 @@ full-stack patterns with a strong AI/Python backend stack.
 > **Note:** This is a portfolio project. Schema, products, and demo data
 > are synthetic.
 
+## Live deployment
+
+- **Storefront:** <https://secureshop-l35h.onrender.com>
+- **API:** <https://secureshop-api-zckt.onrender.com>
+- **API health:** <https://secureshop-api-zckt.onrender.com/api/v1/health>
+
+The public deployment uses a Render static site for the React frontend, a Render
+FastAPI service, managed Neon PostgreSQL, and a Render Key Value service. Stripe
+live payments and email delivery are not enabled for the portfolio demo.
+
 ---
 
 ## Stack
@@ -22,7 +32,7 @@ full-stack patterns with a strong AI/Python backend stack.
 - FastAPI 0.115+ with async route handlers
 - SQLAlchemy 2.0 async ORM over PostgreSQL (asyncpg driver)
 - Alembic for schema migrations
-- Redis for sessions and rate-limit counters
+- Redis/Key Value is provisioned for shared cache/rate-limit state; the current limiter remains process-local
 - Pydantic v2 for request/response validation
 - python-jose + bcrypt for JWT and password hashing
 - slowapi for rate limiting
@@ -181,7 +191,8 @@ secureshop-fastapi/
 │   ├── alembic/                     # migrations
 │   │   ├── env.py
 │   │   └── versions/
-│   │       └── 0001_initial.py
+│   │       ├── 0001_initial.py
+│   │       └── 0002_demo_catalog.py
 │   ├── tests/                       # 23 unit tests (security, schemas, config)
 │   ├── Dockerfile                   # multi-stage, non-root, tini, healthcheck
 │   ├── Makefile                     # one-line entry points
@@ -243,9 +254,10 @@ make test
 - Auth schema validation (password policy, email format, name trimming)
 - Settings parsing (CORS list, env-driven mode toggles)
 
-Tests run with no external dependencies — DB and Redis are not required
-for the unit suite. The `backend` CI job runs the full suite against a
-live Postgres + Redis pair via GitHub Actions services.
+The current unit suite does not require DB or Redis connections. CI still starts
+PostgreSQL and Redis services, applies Alembic migrations, runs the backend tests,
+type-checks/builds the frontend, builds both Docker images, and smoke-tests the
+backend image.
 
 ---
 
