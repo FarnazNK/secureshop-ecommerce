@@ -31,7 +31,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U secureshop -d secureshop_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -56,9 +56,9 @@ jobs:
       COOKIE_SECURE: "false"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -99,22 +99,26 @@ jobs:
       VITE_API_URL: /api/v1
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "20"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install
-        run: npm ci || npm install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --run --passWithNoTests
 
       - name: Build (typecheck + bundle)
         # `npm run build` runs `tsc && vite build` — fails on type errors.
-        # Allowed to fail temporarily on pre-existing type debt.
         run: npm run build
-        continue-on-error: true
 
   # ---------------------------------------------------------------------------
   # Docker build — verifies both Dockerfiles build cleanly.
@@ -128,7 +132,7 @@ jobs:
       matrix:
         project: [backend, frontend]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: docker/setup-buildx-action@v3
 
