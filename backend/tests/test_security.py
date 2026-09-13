@@ -73,8 +73,11 @@ class TestJWT:
 
     def test_tampered_token_rejected(self):
         token = create_access_token("user-1")
-        # Flip one character in the signature.
-        tampered = token[:-1] + ("a" if token[-1] != "a" else "b")
+        header, payload, signature = token.split(".")
+        # Change a non-padding-sensitive signature character so the decoded
+        # signature bytes are guaranteed to differ from the original.
+        replacement = "a" if signature[0] != "a" else "b"
+        tampered = f"{header}.{payload}.{replacement}{signature[1:]}"
         with pytest.raises(JWTError):
             decode_token(tampered, "access")
 
