@@ -47,13 +47,6 @@ export function ProductsPage() {
   const minPrice = searchParams.get('minPrice') || '';
   const maxPrice = searchParams.get('maxPrice') || '';
 
-  // Fetch categories
-  useEffect(() => {
-    api.get('/products/categories')
-      .then(res => setCategories(res.data.data.categories))
-      .catch(console.error);
-  }, []);
-
   // Fetch products
   useEffect(() => {
     setLoading(true);
@@ -63,7 +56,7 @@ export function ProductsPage() {
     params.set('page', currentPage.toString());
     params.set('limit', '12');
     
-    if (currentCategory) params.set('category', currentCategory);
+    if (currentCategory) params.set('category_id', currentCategory);
     if (currentSearch) params.set('search', currentSearch);
     if (minPrice) params.set('minPrice', minPrice);
     if (maxPrice) params.set('maxPrice', maxPrice);
@@ -89,8 +82,54 @@ export function ProductsPage() {
 
     api.get(`/products?${params.toString()}`)
       .then(res => {
-        setProducts(res.data.data.products);
-        setPagination(res.data.data.pagination);
+        const rawProducts = res.data.items ?? [];
+        const mappedProducts = rawProducts.map((product: any) => ({
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          shortDescription: product.short_description,
+          price: Number(product.price),
+          compareAtPrice: product.compare_at_price != null
+            ? Number(product.compare_at_price)
+            : undefined,
+          images: product.images ?? [],
+          category: product.category ?? undefined,
+          isFeatured: Boolean(product.is_featured),
+        }));
+
+        const filteredProducts = mappedProducts.filter((product: Product) => {
+          if (minPrice && product.price < Number(minPrice)) return false;
+          if (maxPrice && product.price > Number(maxPrice)) return false;
+          return true;
+        });
+
+        filteredProducts.sort((a: Product, b: Product) => {
+          if (currentSort === 'price-low') return a.price - b.price;
+          if (currentSort === 'price-high') return b.price - a.price;
+          if (currentSort === 'name') return a.name.localeCompare(b.name);
+          return 0;
+        });
+
+        setProducts(filteredProducts);
+
+        const meta = res.data.meta;
+        setPagination({
+          page: meta.page,
+          limit: meta.limit,
+          total: meta.total,
+          totalPages: meta.total_pages,
+          hasNext: meta.has_next,
+          hasPrev: meta.has_prev,
+        });
+
+        const uniqueCategories = Array.from(
+          new Map(
+            mappedProducts
+              .filter((product: Product) => product.category)
+              .map((product: Product) => [product.category!.id, product.category!])
+          ).values()
+        ) as Category[];
+        setCategories(uniqueCategories);
       })
       .catch(err => {
         setError(err.response?.data?.error?.message || 'Failed to load products');
