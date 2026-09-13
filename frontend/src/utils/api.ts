@@ -1,68 +1,75 @@
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 
-// API configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || '/api/v1').replace(/\/+$/, '');
+const TOKEN_KEY = 'secureshop-access-token';
 
-// Create axios instance with secure defaults
 export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
-  withCredentials: true, // Send cookies with requests
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor
 api.interceptors.request.use(
   (config) => {
-    // Add request ID for tracing
     config.headers['X-Request-ID'] = crypto.randomUUID();
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error),
 );
 
-// Response interceptor
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+    const isRefreshRequest = originalRequest.url?.includes('/auth/refresh');
 
-    // Handle 401 errors (token expired)
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest._retry && !isRefreshRequest) {
       originalRequest._retry = true;
-
       try {
-        // Attempt to refresh token
-        await api.post('/auth/refresh');
-        // Retry original request
+        const refreshResponse = await api.post('/auth/refresh', {});
+        const token = (refreshResponse.data as { access_token?: string }).access_token;
+        if (token) {
+          localStorage.setItem(TOKEN_KEY, token);
+          originalRequest.headers = {
+            ...originalRequest.headers,
+            Authorization: `Bearer ${token}`,
+          };
+        }
         return api(originalRequest);
       } catch {
-        // Refresh failed, redirect to login
+        localStorage.removeItem(TOKEN_KEY);
         window.location.href = '/login';
         return Promise.reject(error);
       }
     }
 
-    // Transform error for easier handling
-    const apiError = {
+    const responseData = error.response?.data as
+      | { detail?: string; error?: string | { code?: string; message?: string; details?: unknown } }
+      | undefined;
+    const nestedError =
+      responseData?.error && typeof responseData.error === 'object' ? responseData.error : undefined;
+
+    return Promise.reject({
       status: error.response?.status || 500,
-      code: (error.response?.data as { error?: { code?: string } })?.error?.code || 'UNKNOWN_ERROR',
+      code: nestedError?.code || 'UNKNOWN_ERROR',
       message:
-        (error.response?.data as { error?: { message?: string } })?.error?.message ||
+        responseData?.detail ||
+        nestedError?.message ||
+        (typeof responseData?.error === 'string' ? responseData.error : undefined) ||
         error.message ||
         'An unexpected error occurred',
-      details: (error.response?.data as { error?: { details?: unknown } })?.error?.details,
-    };
-
-    return Promise.reject(apiError);
-  }
+      details: nestedError?.details,
+    });
+  },
 );
 
-// Type-safe API methods
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
@@ -76,7 +83,6 @@ export interface ApiError {
   details?: Record<string, string[]>;
 }
 
-// Helper to check if error is ApiError
 export function isApiError(error: unknown): error is ApiError {
   return (
     typeof error === 'object' &&
