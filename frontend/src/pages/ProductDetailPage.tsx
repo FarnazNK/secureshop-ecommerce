@@ -46,7 +46,21 @@ export function ProductDetailPage() {
     
     api.get(`/products/${slug}`)
       .then(res => {
-        setProduct(res.data.data.product);
+        const raw = res.data;
+        setProduct({
+          id: raw.id,
+          name: raw.name,
+          slug: raw.slug,
+          description: raw.description,
+          shortDescription: raw.short_description,
+          price: Number(raw.price),
+          compareAtPrice: raw.compare_at_price != null
+            ? Number(raw.compare_at_price)
+            : undefined,
+          quantity: raw.stock_quantity,
+          images: raw.images ?? [],
+          category: raw.category ?? undefined,
+        });
       })
       .catch(err => {
         setError(err.response?.data?.error?.message || 'Product not found');
