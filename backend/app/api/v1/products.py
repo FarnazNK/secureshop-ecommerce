@@ -91,12 +91,13 @@ async def get_product(
 ) -> ProductOut:
     try:
         pid = uuid.UUID(product_id)
-    except ValueError as exc:
-        raise HTTPException(400, detail="invalid product_id") from exc
+        identity_filter = Product.id == pid
+    except ValueError:
+        identity_filter = Product.slug == product_id
 
     stmt = (
         select(Product)
-        .where(Product.id == pid, Product.is_active.is_(True))
+        .where(identity_filter, Product.is_active.is_(True))
         .options(selectinload(Product.images), selectinload(Product.category))
     )
     product = await db.scalar(stmt)
