@@ -89,7 +89,9 @@ def decode_token(token: str, token_type: TokenType) -> dict[str, Any]:
     secret = settings.JWT_ACCESS_SECRET if token_type == "access" else settings.JWT_REFRESH_SECRET
     payload = jwt.decode(token, secret, algorithms=[settings.JWT_ALGORITHM])
     if payload.get("type") != token_type:
-        raise InvalidTokenError(\n            f"token type mismatch: expected {token_type}, got {payload.get('type')}"\n        )
+        raise InvalidTokenError(
+            f"token type mismatch: expected {token_type}, got {payload.get('type')}"
+        )
     return payload
 
 
