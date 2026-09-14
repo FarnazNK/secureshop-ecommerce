@@ -6,7 +6,7 @@ These are pure unit tests — no DB, no HTTP. Fast feedback loop.
 from __future__ import annotations
 
 import pytest
-from jose import JWTError
+from jwt import InvalidTokenError
 
 from app.core.security import (
     create_access_token,
@@ -57,12 +57,12 @@ class TestJWT:
 
     def test_access_token_cant_be_decoded_as_refresh(self):
         access = create_access_token("user-1")
-        with pytest.raises(JWTError):
+        with pytest.raises(InvalidTokenError):
             decode_token(access, "refresh")
 
     def test_refresh_token_cant_be_decoded_as_access(self):
         refresh = create_refresh_token("user-1")
-        with pytest.raises(JWTError):
+        with pytest.raises(InvalidTokenError):
             decode_token(refresh, "access")
 
     def test_each_token_has_unique_jti(self):
@@ -78,7 +78,7 @@ class TestJWT:
         # signature bytes are guaranteed to differ from the original.
         replacement = "a" if signature[0] != "a" else "b"
         tampered = f"{header}.{payload}.{replacement}{signature[1:]}"
-        with pytest.raises(JWTError):
+        with pytest.raises(InvalidTokenError):
             decode_token(tampered, "access")
 
 
