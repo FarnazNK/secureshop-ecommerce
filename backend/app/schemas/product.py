@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+import bleach
+
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.common import Page
 
@@ -60,6 +62,13 @@ class ProductCreate(BaseModel):
     is_featured: bool = False
     category_id: str | None = None
 
+    @field_validator("short_description", "description")
+    @classmethod
+    def sanitize_html_fields(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return bleach.clean(value, tags=[], attributes={}, strip=True)
+
 
 class ProductUpdate(BaseModel):
     """Admin-only: partial update."""
@@ -73,6 +82,13 @@ class ProductUpdate(BaseModel):
     is_active: bool | None = None
     is_featured: bool | None = None
     category_id: str | None = None
+
+    @field_validator("short_description", "description")
+    @classmethod
+    def sanitize_html_fields(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return bleach.clean(value, tags=[], attributes={}, strip=True)
 
 
 # Page[ProductOut] is the response type for GET /products.
