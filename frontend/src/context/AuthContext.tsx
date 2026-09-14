@@ -7,7 +7,7 @@ import {
   useCallback,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../utils/api';
+import { api, clearAccessToken, setAccessToken } from '../utils/api';
 
 interface User {
   id: string;
@@ -52,7 +52,6 @@ interface RegisterData {
   acceptTerms: boolean;
 }
 
-const TOKEN_KEY = 'secureshop-access-token';
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 function mapUser(user: BackendUser): User {
@@ -73,15 +72,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const checkAuth = async () => {
-      if (!localStorage.getItem(TOKEN_KEY)) {
-        setIsLoading(false);
-        return;
-      }
       try {
-        const response = await api.get<BackendUser>('/auth/me');
-        setUser(mapUser(response.data));
+        const response = await api.post<TokenResponse>('/auth/refresh', {});
+        setAccessToken(response.data.access_token);
+        setUser(mapUser(response.data.user));
       } catch {
-        localStorage.removeItem(TOKEN_KEY);
+        clearAccessToken();
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -97,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
       });
-      localStorage.setItem(TOKEN_KEY, response.data.access_token);
+      setAccessToken(response.data.access_token);
       setUser(mapUser(response.data.user));
     },
     [],
@@ -110,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       first_name: data.firstName,
       last_name: data.lastName,
     });
-    localStorage.setItem(TOKEN_KEY, response.data.access_token);
+    setAccessToken(response.data.access_token);
     setUser(mapUser(response.data.user));
   }, []);
 
@@ -120,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Local logout still proceeds if the server is unavailable.
     } finally {
-      localStorage.removeItem(TOKEN_KEY);
+      clearAccessToken();
       setUser(null);
       navigate('/');
     }
@@ -131,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await api.get<BackendUser>('/auth/me');
       setUser(mapUser(response.data));
     } catch {
-      localStorage.removeItem(TOKEN_KEY);
+      clearAccessToken();
       setUser(null);
     }
   }, []);
@@ -142,10 +138,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const refreshInterval = setInterval(async () => {
       try {
         const response = await api.post<TokenResponse>('/auth/refresh', {});
-        localStorage.setItem(TOKEN_KEY, response.data.access_token);
+        setAccessToken(response.data.access_token);
         setUser(mapUser(response.data.user));
       } catch {
-        localStorage.removeItem(TOKEN_KEY);
+        clearAccessToken();
         setUser(null);
       }
     }, 14 * 60 * 1000);
