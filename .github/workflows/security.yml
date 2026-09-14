@@ -41,7 +41,7 @@ jobs:
           python -m pip install --upgrade pip setuptools pip-audit
           pip install -e .
           pip-audit
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: npm
