@@ -10,7 +10,8 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 from passlib.context import CryptContext
 
 from app.core.config import get_settings
@@ -79,7 +80,7 @@ def create_refresh_token(subject: str, claims: dict[str, Any] | None = None) -> 
 
 
 def decode_token(token: str, token_type: TokenType) -> dict[str, Any]:
-    """Decode and verify a token. Raises `JWTError` on any problem.
+    """Decode and verify a token. Raises `InvalidTokenError` on any problem.
 
     We use distinct secrets per token type so an access token can't be
     repurposed as a refresh token even if a secret leaks.
@@ -88,7 +89,7 @@ def decode_token(token: str, token_type: TokenType) -> dict[str, Any]:
     secret = settings.JWT_ACCESS_SECRET if token_type == "access" else settings.JWT_REFRESH_SECRET
     payload = jwt.decode(token, secret, algorithms=[settings.JWT_ALGORITHM])
     if payload.get("type") != token_type:
-        raise JWTError(f"token type mismatch: expected {token_type}, got {payload.get('type')}")
+        raise InvalidTokenError(\n            f"token type mismatch: expected {token_type}, got {payload.get('type')}"\n        )
     return payload
 
 
