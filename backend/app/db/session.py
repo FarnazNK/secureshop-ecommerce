@@ -8,6 +8,7 @@ that yields a session per request and rolls back on exception.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -20,16 +21,27 @@ from app.core.config import get_settings
 _settings = get_settings()
 
 
-# Convert postgres:// URL to postgresql+asyncpg:// for SQLAlchemy async engine.
-# Pydantic gives us a normalized URL; we just adjust the scheme.
+# Convert PostgreSQL URLs to the asyncpg dialect and remove libpq-only query
+# parameters (for example Neon may add channel_binding/sslmode).
 def _to_async_url(raw: str) -> str:
     if raw.startswith("postgresql+asyncpg://"):
-        return raw
-    if raw.startswith("postgresql://"):
-        return raw.replace("postgresql://", "postgresql+asyncpg://", 1)
-    if raw.startswith("postgres://"):
-        return raw.replace("postgres://", "postgresql+asyncpg://", 1)
-    return raw
+        converted = raw
+    elif raw.startswith("postgresql://"):
+        converted = raw.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif raw.startswith("postgres://"):
+        converted = raw.replace("postgres://", "postgresql+asyncpg://", 1)
+    else:
+        converted = raw
+
+    parts = urlsplit(converted)
+    safe_query = [
+        (key, value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if key not in {"channel_binding", "sslmode"}
+    ]
+    return urlunsplit(
+        (parts.scheme, parts.netloc, parts.path, urlencode(safe_query), parts.fragment)
+    )
 
 
 _DB_URL = _to_async_url(str(_settings.DATABASE_URL))
@@ -37,6 +49,7 @@ _DB_URL = _to_async_url(str(_settings.DATABASE_URL))
 
 engine = create_async_engine(
     _DB_URL,
+    connect_args={"ssl": True} if _settings.DATABASE_SSL else {},
     # Echo SQL only in debug mode — too chatty otherwise.
     echo=_settings.LOG_LEVEL == "DEBUG",
     # Pool tuning: defaults are fine for portfolio scale. For prod, tune
