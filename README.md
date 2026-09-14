@@ -64,6 +64,7 @@ the application.
 - docker-compose stack with persistent volumes
 - GitHub Actions CI: lint, format check, tests against live Postgres/Redis,
   Docker build matrix
+- AWS Lambda/SAM backend deployment path with GitHub OIDC, Function URLs, CloudWatch logging, and cost caps
 
 ---
 
@@ -294,3 +295,7 @@ backend image.
 ---
 
 *Built by Farnaz Nasehi.*
+
+## AWS deployment
+
+This repository includes an AWS Lambda/SAM deployment path under [`infra/aws/`](./infra/aws/README.md). It uses GitHub OIDC rather than long-lived AWS access keys, exposes the FastAPI backend through a Lambda Function URL, sends logs to CloudWatch, and applies low-cost portfolio defaults. AWS is prepared but is not claimed as live until an AWS account/role is connected and the deployment workflow succeeds.
