@@ -122,6 +122,7 @@ def create_app() -> FastAPI:
                 "api.secureshop.example",
                 "secureshop.example",
                 "*.onrender.com",
+                "*.on.aws",
             ],
         )
 
