@@ -1,4 +1,4 @@
-.PHONY: install dev test lint format migrate revision serve clean help
+.PHONY: install dev test lint format migrate revision serve clean help build-SecureShopApi
 
 help:
 	@echo "Targets:"
@@ -43,3 +43,6 @@ clean:
 	rm -rf .pytest_cache .ruff_cache .mypy_cache build dist *.egg-info \
 	       coverage.xml .coverage htmlcov
 	find . -type d -name __pycache__ -exec rm -rf {} +
+
+build-SecureShopApi:
+	pip install . --target "$(ARTIFACTS_DIR)"
