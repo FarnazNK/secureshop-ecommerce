@@ -15,7 +15,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 
 from app.api.v1 import api_router
 from app.core.config import get_settings
@@ -127,8 +127,13 @@ def create_app() -> FastAPI:
 
     # --- Routes ---
     @app.get("/", include_in_schema=False)
-    async def root() -> RedirectResponse:
-        return RedirectResponse(url=settings.FRONTEND_URL, status_code=307)
+    async def root() -> dict[str, str]:
+        return {
+            "name": "SecureShop API",
+            "status": "online",
+            "health": "/api/v1/health",
+            "products": "/api/v1/products",
+        }
 
     app.include_router(api_router, prefix="/api")
 
