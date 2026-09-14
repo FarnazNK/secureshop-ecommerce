@@ -19,6 +19,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: vars.AWS_ROLE_ARN != ''
     runs-on: ubuntu-latest
     environment: aws
     steps:
