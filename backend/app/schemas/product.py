@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import UUID
 
 import bleach
 from pydantic import BaseModel, Field, field_validator
@@ -13,7 +14,7 @@ from app.schemas.common import Page
 class CategoryRef(BaseModel):
     """Lightweight category reference for embedding in product responses."""
 
-    id: str
+    id: UUID
     name: str
     slug: str
 
@@ -31,7 +32,7 @@ class ProductImageOut(BaseModel):
 class ProductOut(BaseModel):
     """Product as returned by the API (list and detail use the same shape)."""
 
-    id: str
+    id: UUID
     name: str
     slug: str
     short_description: str | None = None
@@ -59,7 +60,7 @@ class ProductCreate(BaseModel):
     stock_quantity: int = Field(default=0, ge=0)
     is_active: bool = True
     is_featured: bool = False
-    category_id: str | None = None
+    category_id: UUID | None = None
 
     @field_validator("short_description", "description")
     @classmethod
@@ -80,7 +81,7 @@ class ProductUpdate(BaseModel):
     stock_quantity: int | None = Field(default=None, ge=0)
     is_active: bool | None = None
     is_featured: bool | None = None
-    category_id: str | None = None
+    category_id: UUID | None = None
 
     @field_validator("short_description", "description")
     @classmethod
