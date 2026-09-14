@@ -1,7 +1,15 @@
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || '/api/v1').replace(/\/+$/, '');
-const TOKEN_KEY = 'secureshop-access-token';
+let accessToken: string | null = null;
+
+export function setAccessToken(token: string | null): void {
+  accessToken = token;
+}
+
+export function clearAccessToken(): void {
+  accessToken = null;
+}
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -15,9 +23,8 @@ export const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     config.headers['X-Request-ID'] = crypto.randomUUID();
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
     }
     return config;
   },
@@ -36,7 +43,7 @@ api.interceptors.response.use(
         const refreshResponse = await api.post('/auth/refresh', {});
         const token = (refreshResponse.data as { access_token?: string }).access_token;
         if (token) {
-          localStorage.setItem(TOKEN_KEY, token);
+          setAccessToken(token);
           originalRequest.headers = {
             ...originalRequest.headers,
             Authorization: `Bearer ${token}`,
@@ -44,7 +51,7 @@ api.interceptors.response.use(
         }
         return api(originalRequest);
       } catch {
-        localStorage.removeItem(TOKEN_KEY);
+        clearAccessToken();
         window.location.href = '/login';
         return Promise.reject(error);
       }
