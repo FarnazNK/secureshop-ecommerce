@@ -6,6 +6,8 @@
 [![Security](https://img.shields.io/badge/Security-OWASP%20Top%2010-green)](https://owasp.org/)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#run-with-docker)
 
+**Live:** [Storefront](https://secureshop-l35h.onrender.com) · [API Health](https://secureshop-api-zckt.onrender.com/api/v1/health)
+
 A production-style e-commerce platform with a Python/FastAPI backend, a
 React/TypeScript frontend, and a security model aligned with the OWASP
 Top 10. Built as a portfolio piece demonstrating end-to-end secure
