@@ -6,7 +6,7 @@
 [![Security](https://img.shields.io/badge/Security-OWASP%20Top%2010-green)](https://owasp.org/)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#run-with-docker)
 
-**Live:** [Storefront](https://secureshop-l35h.onrender.com) · [API Health](https://secureshop-api-zckt.onrender.com/api/v1/health)
+**Live:** [Storefront](https://secureshop-l35h.onrender.com) · [Products API](https://secureshop-api-zckt.onrender.com/api/v1/products) · [API Health](https://secureshop-api-zckt.onrender.com/api/v1/health)
 
 A production-style e-commerce platform with a Python/FastAPI backend, a
 React/TypeScript frontend, and a security model aligned with the OWASP
@@ -17,12 +17,12 @@ full-stack patterns with a strong AI/Python backend stack.
 > are synthetic.
 >
 > **Live demo:** <https://secureshop-l35h.onrender.com>  
-> **Public API:** <https://secureshop-api-zckt.onrender.com/api/v1/health>
+> **Products API:** <https://secureshop-api-zckt.onrender.com/api/v1/products>
 
 ## Live deployment
 
 - **Storefront:** <https://secureshop-l35h.onrender.com>
-- **API:** <https://secureshop-api-zckt.onrender.com>
+- **Products API:** <https://secureshop-api-zckt.onrender.com/api/v1/products>
 - **API health:** <https://secureshop-api-zckt.onrender.com/api/v1/health>
 
 The public deployment uses a Render static site for the React frontend, a Render
