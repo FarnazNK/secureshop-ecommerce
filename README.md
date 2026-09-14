@@ -49,7 +49,7 @@ the application.
 - Alembic for schema migrations
 - Redis/Key Value is provisioned for shared cache/rate-limit state; the current limiter remains process-local
 - Pydantic v2 for request/response validation
-- python-jose + bcrypt for JWT and password hashing
+- PyJWT + bcrypt for JWT and password hashing
 - slowapi for rate limiting
 - structlog for JSON-structured logging in production
 
@@ -87,7 +87,7 @@ Built around the OWASP Top 10 and standard defense-in-depth patterns:
 - Custom security-headers middleware: CSP, HSTS in prod, X-Frame-Options,
   X-Content-Type-Options, Referrer-Policy, Permissions-Policy
 - CORS with explicit allowed origins (no `*` with credentials)
-- Per-IP rate limiting via slowapi, tighter on auth endpoints
+- Per-IP rate limiting with tighter auth-endpoint limits
 - TrustedHostMiddleware in production
 - Pydantic v2 validation on every request body, query, and path param
 - Centralized exception handler that never leaks stack traces to clients
@@ -257,40 +257,3 @@ weak crypto.
 ---
 
 ## Testing
-
-```bash
-cd backend
-make test
-```
-
-23 unit tests covering:
-- Password hashing (round-trip, salt uniqueness, malformed-hash safety)
-- JWT (round-trip, type isolation, JTI uniqueness, tampering rejection)
-- Auth schema validation (password policy, email format, name trimming)
-- Settings parsing (CORS list, env-driven mode toggles)
-
-The current unit suite does not require DB or Redis connections. CI still starts
-PostgreSQL and Redis services, applies Alembic migrations, runs the backend tests,
-type-checks/builds the frontend, builds both Docker images, and smoke-tests the
-backend image.
-
----
-
-## Production considerations not handled
-
-- **HTTPS termination** — production should sit behind a load balancer
-  (ALB / nginx / Caddy) doing TLS termination and forwarding `X-Forwarded-*`.
-  `proxy-headers` is already enabled in the uvicorn command.
-- **Email delivery** — SMTP is wired in but not configured by default.
-  Verification and password reset emails will no-op until SMTP env vars are set.
-- **Stripe webhook handler** — payment intents are created server-side; the
-  webhook that flips orders to `PAID` status would land in a follow-up PR.
-- **Horizontal scaling** — current setup is single-process and rate limiting is
-  process-local. For real prod, move distributed rate limiting/cache state to
-  Redis and run multiple uvicorn workers.
-- **Secret management** — secrets come from env vars. Production should
-  pull from a secret manager (Vault, AWS Secrets Manager, GCP Secret Manager).
-
----
-
-*Built by Farnaz Nasehi.*
