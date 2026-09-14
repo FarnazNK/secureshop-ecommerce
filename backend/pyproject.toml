@@ -22,7 +22,7 @@ dependencies = [
     # Auth + crypto
     "PyJWT>=2.10",
     "passlib[bcrypt]>=1.7",
-    "bcrypt>=4.0,<5.0",  # passlib 1.7 doesn't support bcrypt 5.x yet
+    "bcrypt>=4.0,<6.0",  # passlib 1.7 doesn't support bcrypt 5.x yet
     "python-multipart>=0.0.12",  # form parsing for OAuth2 password flow
 
     # Security middleware
