@@ -13,7 +13,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from jose import JWTError
+from jwt import InvalidTokenError
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -176,7 +176,7 @@ async def rotate_refresh_token(
     """
     try:
         payload = decode_token(refresh_token, "refresh")
-    except JWTError as exc:
+    except InvalidTokenError as exc:
         raise AuthError("invalid refresh token", code="invalid_refresh") from exc
 
     jti = payload.get("jti")
@@ -222,7 +222,7 @@ async def logout(db: AsyncSession, refresh_token: str) -> None:
     we don't error (the client just wants to be logged out)."""
     try:
         payload = decode_token(refresh_token, "refresh")
-    except JWTError:
+    except InvalidTokenError:
         return
     jti = payload.get("jti")
     if not jti:
