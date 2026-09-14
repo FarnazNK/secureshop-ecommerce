@@ -44,6 +44,7 @@ dependencies = [
 
     # HTTP client (for Stripe webhooks etc.)
     "httpx>=0.28",
+    "mangum>=0.19",
 ]
 
 [project.optional-dependencies]
