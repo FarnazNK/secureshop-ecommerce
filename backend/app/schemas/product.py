@@ -5,7 +5,6 @@ from __future__ import annotations
 from decimal import Decimal
 
 import bleach
-
 from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.common import Page
