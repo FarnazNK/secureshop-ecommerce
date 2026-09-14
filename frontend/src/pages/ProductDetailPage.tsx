@@ -350,10 +350,9 @@ export function ProductDetailPage() {
         {product.description && (
           <div className="mt-16">
             <h2 className="text-display-sm font-display text-ink-900 mb-6">Description</h2>
-            <div 
-              className="prose prose-lg max-w-none text-ink-600"
-              dangerouslySetInnerHTML={{ __html: product.description }}
-            />
+            <p className="prose prose-lg max-w-none whitespace-pre-wrap text-ink-600">
+              {product.description}
+            </p>
           </div>
         )}
 
