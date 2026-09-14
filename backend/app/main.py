@@ -7,6 +7,8 @@ handler. Returns an ASGI app that uvicorn can serve.
 
 from __future__ import annotations
 
+import time
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -14,10 +16,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
 
 from app.api.v1 import api_router
 from app.core.config import get_settings
@@ -27,11 +25,19 @@ from app.middleware.security_headers import SecurityHeadersMiddleware
 
 log = get_logger(__name__)
 
+_rate_windows: dict[str, deque[float]] = defaultdict(deque)
 
-# Limiter is module-level so route decorators can attach to it.
-# slowapi reads the IP from request.client.host; for prod behind a proxy,
-# wire X-Forwarded-For via TrustedHostMiddleware + ProxyHeadersMiddleware.
-limiter = Limiter(key_func=get_remote_address)
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _rate_limit_response(retry_after: int) -> JSONResponse:
+    return JSONResponse(
+        status_code=429,
+        content={"error": "rate limit exceeded"},
+        headers={"Retry-After": str(max(1, retry_after))},
+    )
 
 
 @asynccontextmanager
@@ -56,10 +62,35 @@ def create_app() -> FastAPI:
         lifespan=_lifespan,
     )
 
-    # --- Rate limiter ---
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-    app.add_middleware(SlowAPIMiddleware)
+    # --- Rate limiting ---
+    # Process-local is sufficient for the single-instance portfolio deployment.
+    # Move this state to Redis before running multiple API instances.
+    @app.middleware("http")
+    async def rate_limit_middleware(request: Request, call_next):
+        now = time.monotonic()
+        auth_path = request.url.path in {
+            "/api/v1/auth/login",
+            "/api/v1/auth/register",
+            "/api/v1/auth/refresh",
+        }
+        if auth_path:
+            window_seconds = settings.AUTH_RATE_LIMIT_WINDOW_MINUTES * 60
+            limit = settings.AUTH_RATE_LIMIT_MAX_REQUESTS
+            bucket = "auth"
+        else:
+            window_seconds = settings.RATE_LIMIT_WINDOW_MINUTES * 60
+            limit = settings.RATE_LIMIT_MAX_REQUESTS
+            bucket = "api"
+
+        key = f"{bucket}:{_client_ip(request)}"
+        events = _rate_windows[key]
+        while events and now - events[0] >= window_seconds:
+            events.popleft()
+        if len(events) >= limit:
+            retry_after = int(window_seconds - (now - events[0])) if events else window_seconds
+            return _rate_limit_response(retry_after)
+        events.append(now)
+        return await call_next(request)
 
     # --- Compression ---
     app.add_middleware(GZipMiddleware, minimum_size=1024)
