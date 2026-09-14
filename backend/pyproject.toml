@@ -20,7 +20,7 @@ dependencies = [
     "redis>=5.2",
 
     # Auth + crypto
-    "python-jose[cryptography]>=3.3",
+    "PyJWT>=2.10",
     "passlib[bcrypt]>=1.7",
     "bcrypt>=4.0,<5.0",  # passlib 1.7 doesn't support bcrypt 5.x yet
     "python-multipart>=0.0.12",  # form parsing for OAuth2 password flow
@@ -43,7 +43,8 @@ dependencies = [
     "structlog>=24.4",
 
     # HTTP client (for Stripe webhooks etc.)
-    "httpx>=0.28",]
+    "httpx>=0.28",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -54,13 +55,12 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
     "types-passlib",
-    "types-python-jose",
     "types-redis",
     "faker>=33.0",
 ]
 
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=83", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
