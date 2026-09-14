@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SecureShop portfolio API on AWS Lambda
+
+Parameters:
+  DatabaseUrl:
+    Type: String
+    NoEcho: true
+  JwtAccessSecret:
+    Type: String
+    NoEcho: true
+  JwtRefreshSecret:
+    Type: String
+    NoEcho: true
+  EncryptionKey:
+    Type: String
+    NoEcho: true
+  FrontendUrl:
+    Type: String
+    Default: https://secureshop-l35h.onrender.com
+
+Resources:
+  SecureShopApi:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      CodeUri: ../../backend/
+      Handler: app.lambda_handler.handler
+      Runtime: python3.12
+      Architectures: [x86_64]
+      MemorySize: 768
+      Timeout: 30
+      ReservedConcurrentExecutions: 2
+      Environment:
+        Variables:
+          NODE_ENV: production
+          DATABASE_URL: !Ref DatabaseUrl
+          DATABASE_SSL: 'true'
+          REDIS_URL: redis://localhost:6379
+          JWT_ACCESS_SECRET: !Ref JwtAccessSecret
+          JWT_REFRESH_SECRET: !Ref JwtRefreshSecret
+          ENCRYPTION_KEY: !Ref EncryptionKey
+          ALLOWED_ORIGINS: !Ref FrontendUrl
+          FRONTEND_URL: !Ref FrontendUrl
+          COOKIE_SECURE: 'true'
+          COOKIE_SAMESITE: none
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins:
+            - https://secureshop-l35h.onrender.com
+          AllowMethods: [GET, POST, PATCH, PUT, DELETE, OPTIONS]
+          AllowHeaders: [Authorization, Content-Type, X-Request-ID]
+          AllowCredentials: true
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
+  SecureShopLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${SecureShopApi}
+      RetentionInDays: 7
+
+Outputs:
+  ApiUrl:
+    Description: SecureShop Lambda Function URL
+    Value: !GetAtt SecureShopApiUrl.FunctionUrl
