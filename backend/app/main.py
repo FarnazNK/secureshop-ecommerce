@@ -51,14 +51,15 @@ async def _lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    docs_enabled = not settings.is_prod or settings.ENABLE_DOCS
 
     app = FastAPI(
         title="SecureShop API",
         description="Secure e-commerce API server (FastAPI port).",
         version="1.0.0",
-        docs_url="/api/docs" if not settings.is_prod else None,
-        redoc_url="/api/redoc" if not settings.is_prod else None,
-        openapi_url="/api/openapi.json" if not settings.is_prod else None,
+        docs_url="/api/docs" if docs_enabled else None,
+        redoc_url="/api/redoc" if docs_enabled else None,
+        openapi_url="/api/openapi.json" if docs_enabled else None,
         lifespan=_lifespan,
     )
 
@@ -115,25 +116,23 @@ def create_app() -> FastAPI:
 
     # --- Trusted hosts in prod ---
     if settings.is_prod:
-        # Replace with your actual prod hostnames.
         app.add_middleware(
             TrustedHostMiddleware,
-            allowed_hosts=[
-                "api.secureshop.example",
-                "secureshop.example",
-                "*.onrender.com",
-            ],
+            allowed_hosts=settings.allowed_hosts_list,
         )
 
     # --- Routes ---
     @app.get("/", include_in_schema=False)
     async def root() -> dict[str, str]:
-        return {
+        response = {
             "name": "SecureShop API",
             "status": "online",
             "health": "/api/v1/health",
             "products": "/api/v1/products",
         }
+        if docs_enabled:
+            response["docs"] = "/api/docs"
+        return response
 
     app.include_router(api_router, prefix="/api")
 
