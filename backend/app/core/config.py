@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     NODE_ENV: Literal["development", "test", "production"] = "development"
     PORT: int = 3001
     API_VERSION: str = "v1"
+    ENABLE_DOCS: bool = False
+    ALLOWED_HOSTS: str = "localhost,127.0.0.1,*.onrender.com,*.run.app"
+
+    @property
+    def allowed_hosts_list(self) -> list[str]:
+        return [host.strip() for host in self.ALLOWED_HOSTS.split(",") if host.strip()]
 
     # --- Database ---
     DATABASE_URL: PostgresDsn
