@@ -48,7 +48,7 @@ USER app
 EXPOSE 3001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:3001/api/v1/health', timeout=3)" || exit 1
+    CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.getenv('PORT', '3001') + '/api/v1/health', timeout=3)" || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3001", "--proxy-headers"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-3001} --proxy-headers"]
