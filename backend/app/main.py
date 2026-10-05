@@ -15,9 +15,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.api.v1 import api_router
+from app.api_reference import render_api_reference
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.middleware.request_logging import RequestLoggingMiddleware
@@ -118,11 +119,7 @@ def create_app() -> FastAPI:
         # Replace with your actual prod hostnames.
         app.add_middleware(
             TrustedHostMiddleware,
-            allowed_hosts=[
-                "api.secureshop.example",
-                "secureshop.example",
-                "*.onrender.com",
-            ],
+            allowed_hosts=settings.allowed_hosts_list,
         )
 
     # --- Routes ---
@@ -136,6 +133,10 @@ def create_app() -> FastAPI:
         }
 
     app.include_router(api_router, prefix="/api")
+
+    @app.get("/api/reference", response_class=HTMLResponse, include_in_schema=False)
+    async def api_reference() -> HTMLResponse:
+        return HTMLResponse(render_api_reference(app.openapi()))
 
     # --- Global exception handler ---
     @app.exception_handler(Exception)

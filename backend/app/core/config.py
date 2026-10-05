@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     NODE_ENV: Literal["development", "test", "production"] = "development"
     PORT: int = 3001
     API_VERSION: str = "v1"
+    ALLOWED_HOSTS: str = "api.secureshop.example,secureshop.example,*.onrender.com"
+    DB_POOL_DISABLED: bool = False
 
     # --- Database ---
     DATABASE_URL: PostgresDsn
@@ -56,6 +58,10 @@ class Settings(BaseSettings):
     @property
     def allowed_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def allowed_hosts_list(self) -> list[str]:
+        return [host.strip() for host in self.ALLOWED_HOSTS.split(",") if host.strip()]
 
     # --- Rate limiting ---
     RATE_LIMIT_WINDOW_MINUTES: int = 15
