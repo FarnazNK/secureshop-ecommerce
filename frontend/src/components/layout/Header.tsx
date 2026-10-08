@@ -95,11 +95,11 @@ export function Header() {
                   to={item.href}
                   className={cn(
                     'nav-link relative py-1',
-                    location.pathname === item.href && 'nav-link-active'
+                    `${location.pathname}${location.search}` === item.href && 'nav-link-active'
                   )}
                 >
                   {item.name}
-                  {location.pathname === item.href && (
+                  {`${location.pathname}${location.search}` === item.href && (
                     <motion.div
                       layoutId="nav-indicator"
                       className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-primary-500"
@@ -188,7 +188,7 @@ export function Header() {
                       className={cn(
                         'block py-3 px-4 rounded-soft text-body-lg',
                         'transition-colors duration-200',
-                        location.pathname === item.href
+                        `${location.pathname}${location.search}` === item.href
                           ? 'bg-sand-100 text-ink-900 font-medium'
                           : 'text-ink-600 hover:bg-sand-100 hover:text-ink-900'
                       )}
@@ -274,14 +274,14 @@ function SearchModal({ onClose }: { onClose: () => void }) {
         className="fixed top-0 left-0 right-0 bg-sand-50 z-50 shadow-elevated"
       >
         <div className="container-page py-6">
-          <form role="search" className="flex items-center gap-4" onSubmit={(event) => {
+          <form role="search" className="flex flex-wrap items-center gap-3" onSubmit={(event) => {
             event.preventDefault();
             const term = query.trim();
             if (!term) return;
             navigate(`/products?search=${encodeURIComponent(term)}`);
             onClose();
           }} onKeyDown={(event) => { if (event.key === "Escape") onClose(); }}>
-            <div className="flex-1 relative">
+            <div className="flex-1 min-w-[180px] relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-400" />
               <input
                 type="text"
