@@ -8,6 +8,7 @@ from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import make_url
 
 from app.core.config import get_settings
 from app.db.base import Base
@@ -22,10 +23,10 @@ if config.config_file_name is not None:
 
 # Override sqlalchemy.url with our app's URL (sync version for alembic).
 settings = get_settings()
-sync_url = str(settings.DATABASE_URL)
-if sync_url.startswith("postgresql+asyncpg://"):
-    sync_url = sync_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
-config.set_main_option("sqlalchemy.url", sync_url)
+sync_url = make_url(str(settings.DATABASE_URL)).set(drivername="postgresql+psycopg2")
+config.set_main_option(
+    "sqlalchemy.url", sync_url.render_as_string(hide_password=False).replace("%", "%%")
+)
 
 target_metadata = Base.metadata
 
