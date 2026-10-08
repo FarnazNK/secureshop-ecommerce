@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
@@ -7,7 +7,6 @@ import {
   User,
   Menu,
   X,
-  Heart,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
@@ -16,8 +15,7 @@ import { cn } from '../../utils/cn';
 const navigation = [
   { name: 'Shop', href: '/products' },
   { name: 'New Arrivals', href: '/products?sort=newest' },
-  { name: 'Collections', href: '/collections' },
-  { name: 'About', href: '/about' },
+  { name: 'Explore', href: '/products?sort=name' },
 ];
 
 export function Header() {
@@ -39,7 +37,8 @@ export function Header() {
   // Close mobile menu on route change
   useEffect(() => {
     setIsMobileMenuOpen(false);
-  }, [location.pathname]);
+    setIsSearchOpen(false);
+  }, [location.pathname, location.search]);
 
   return (
     <>
@@ -67,7 +66,9 @@ export function Header() {
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="btn-icon md:hidden"
-              aria-label="Toggle menu"
+              aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-navigation"
             >
               {isMobileMenuOpen ? (
                 <X className="w-5 h-5" />
@@ -94,11 +95,11 @@ export function Header() {
                   to={item.href}
                   className={cn(
                     'nav-link relative py-1',
-                    location.pathname === item.href && 'nav-link-active'
+                    `${location.pathname}${location.search}` === item.href && 'nav-link-active'
                   )}
                 >
                   {item.name}
-                  {location.pathname === item.href && (
+                  {`${location.pathname}${location.search}` === item.href && (
                     <motion.div
                       layoutId="nav-indicator"
                       className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-primary-500"
@@ -120,15 +121,6 @@ export function Header() {
                 <Search className="w-5 h-5" />
               </button>
 
-              {/* Wishlist (desktop only) */}
-              <Link
-                to="/wishlist"
-                className="btn-icon hidden md:flex"
-                aria-label="Wishlist"
-              >
-                <Heart className="w-5 h-5" />
-              </Link>
-
               {/* Account */}
               <Link
                 to={isAuthenticated ? '/account' : '/login'}
@@ -142,7 +134,7 @@ export function Header() {
               <Link
                 to="/cart"
                 className="btn-icon relative"
-                aria-label="Cart"
+                aria-label={`Cart, ${itemCount} items`}
               >
                 <ShoppingBag className="w-5 h-5" />
                 {itemCount > 0 && (
@@ -181,13 +173,14 @@ export function Header() {
                   <button
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="btn-icon"
+                    aria-label="Close menu"
                   >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
 
                 {/* Mobile navigation */}
-                <nav className="space-y-1 mb-8">
+                <nav id="mobile-navigation" aria-label="Mobile navigation" className="space-y-1 mb-8">
                   {navigation.map((item) => (
                     <Link
                       key={item.name}
@@ -195,7 +188,7 @@ export function Header() {
                       className={cn(
                         'block py-3 px-4 rounded-soft text-body-lg',
                         'transition-colors duration-200',
-                        location.pathname === item.href
+                        `${location.pathname}${location.search}` === item.href
                           ? 'bg-sand-100 text-ink-900 font-medium'
                           : 'text-ink-600 hover:bg-sand-100 hover:text-ink-900'
                       )}
@@ -228,12 +221,6 @@ export function Header() {
                         className="block py-2 text-body-md text-ink-700 hover:text-ink-900"
                       >
                         Orders
-                      </Link>
-                      <Link
-                        to="/wishlist"
-                        className="block py-2 text-body-md text-ink-700 hover:text-ink-900"
-                      >
-                        Wishlist
                       </Link>
                     </div>
                   </div>
@@ -268,6 +255,7 @@ export function Header() {
 
 function SearchModal({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('');
+  const navigate = useNavigate();
 
   return (
     <>
@@ -286,22 +274,30 @@ function SearchModal({ onClose }: { onClose: () => void }) {
         className="fixed top-0 left-0 right-0 bg-sand-50 z-50 shadow-elevated"
       >
         <div className="container-page py-6">
-          <div className="flex items-center gap-4">
-            <div className="flex-1 relative">
+          <form role="search" className="flex flex-wrap items-center gap-3" onSubmit={(event) => {
+            event.preventDefault();
+            const term = query.trim();
+            if (!term) return;
+            navigate(`/products?search=${encodeURIComponent(term)}`);
+            onClose();
+          }} onKeyDown={(event) => { if (event.key === "Escape") onClose(); }}>
+            <div className="flex-1 min-w-[180px] relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-400" />
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                aria-label="Search products"
                 placeholder="Search products..."
                 className="input pl-12 text-body-lg"
                 autoFocus
               />
             </div>
-            <button onClick={onClose} className="btn-ghost">
+            <button type="submit" disabled={!query.trim()} className="btn-primary">Search</button>
+            <button type="button" onClick={onClose} className="btn-ghost">
               Cancel
             </button>
-          </div>
+          </form>
 
           {/* Quick links */}
           <div className="mt-6">

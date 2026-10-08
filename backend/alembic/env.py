@@ -24,7 +24,7 @@ if config.config_file_name is not None:
 settings = get_settings()
 sync_url = str(settings.DATABASE_URL)
 if sync_url.startswith("postgresql+asyncpg://"):
-    sync_url = sync_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+    sync_url = sync_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
 config.set_main_option("sqlalchemy.url", sync_url)
 
 target_metadata = Base.metadata

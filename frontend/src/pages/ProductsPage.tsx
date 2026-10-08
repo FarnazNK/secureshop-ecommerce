@@ -49,6 +49,7 @@ export function ProductsPage() {
 
   // Fetch products
   useEffect(() => {
+    let active = true;
     setLoading(true);
     setError(null);
 
@@ -82,6 +83,7 @@ export function ProductsPage() {
 
     api.get(`/products?${params.toString()}`)
       .then(res => {
+        if (!active) return;
         const rawProducts = res.data.items ?? [];
         const mappedProducts = rawProducts.map((product: any) => ({
           id: product.id,
@@ -132,9 +134,11 @@ export function ProductsPage() {
         setCategories(uniqueCategories);
       })
       .catch(err => {
+        if (!active) return;
         setError(err.response?.data?.error?.message || 'Failed to load products');
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [currentPage, currentCategory, currentSort, currentSearch, minPrice, maxPrice]);
 
   const updateFilters = (updates: Record<string, string>) => {
@@ -179,6 +183,7 @@ export function ProductsPage() {
                 </label>
                 <input
                   type="text"
+                  aria-label="Search products"
                   value={currentSearch}
                   onChange={(e) => updateFilters({ search: e.target.value })}
                   placeholder="Search products..."
@@ -192,6 +197,7 @@ export function ProductsPage() {
                   Category
                 </label>
                 <select
+                  aria-label="Filter by category"
                   value={currentCategory}
                   onChange={(e) => updateFilters({ category: e.target.value })}
                   className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
@@ -213,6 +219,8 @@ export function ProductsPage() {
                 <div className="flex gap-2 items-center">
                   <input
                     type="number"
+                    aria-label="Minimum price"
+                    min="0"
                     value={minPrice}
                     onChange={(e) => updateFilters({ minPrice: e.target.value })}
                     placeholder="Min"
@@ -221,6 +229,8 @@ export function ProductsPage() {
                   <span className="text-ink-400">-</span>
                   <input
                     type="number"
+                    aria-label="Maximum price"
+                    min="0"
                     value={maxPrice}
                     onChange={(e) => updateFilters({ maxPrice: e.target.value })}
                     placeholder="Max"
@@ -240,18 +250,19 @@ export function ProductsPage() {
           </aside>
 
           {/* Product Grid */}
-          <main className="flex-1">
+          <section aria-label="Product results" aria-busy={loading} className="flex-1">
             {/* Sort & Results Count */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
               <p className="text-ink-600">
                 {pagination && (
                   <>
-                    Showing {((currentPage - 1) * pagination.limit) + 1}-
+                    Showing {pagination.total === 0 ? 0 : ((currentPage - 1) * pagination.limit) + 1}-
                     {Math.min(currentPage * pagination.limit, pagination.total)} of {pagination.total} products
                   </>
                 )}
               </p>
               <select
+                aria-label="Sort products"
                 value={currentSort}
                 onChange={(e) => updateFilters({ sort: e.target.value })}
                 className="px-4 py-2 border border-ink-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent-500"
@@ -281,7 +292,7 @@ export function ProductsPage() {
             {/* Error State */}
             {error && (
               <div className="text-center py-12">
-                <p className="text-red-600 mb-4">{error}</p>
+                <p role="alert" className="text-red-600 mb-4">{error}</p>
                 <button
                   onClick={() => window.location.reload()}
                   className="btn-primary"
@@ -363,7 +374,7 @@ export function ProductsPage() {
                 )}
               </>
             )}
-          </main>
+          </section>
         </div>
       </div>
     </div>
