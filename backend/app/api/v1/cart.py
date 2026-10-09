@@ -35,6 +35,7 @@ async def _get_or_create_cart(db: AsyncSession, user: User) -> Cart:
     cart = await db.scalar(
         select(Cart)
         .where(Cart.user_id == user.id)
+        .execution_options(populate_existing=True)
         .options(
             selectinload(Cart.items).selectinload(CartItem.product).selectinload(Product.images)
         )
@@ -43,7 +44,7 @@ async def _get_or_create_cart(db: AsyncSession, user: User) -> Cart:
         cart = Cart(user_id=user.id)
         db.add(cart)
         await db.commit()
-        await db.refresh(cart)
+        await db.refresh(cart, attribute_names=["items"])
     return cart
 
 
