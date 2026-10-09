@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
 
@@ -55,9 +56,11 @@ engine = create_async_engine(
     # Pool tuning: defaults are fine for portfolio scale. For prod, tune
     # based on observed concurrent requests vs DB capacity.
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
-    pool_recycle=1800,  # recycle connections every 30 min
+    **(
+        {"poolclass": NullPool}
+        if _settings.DB_POOL_DISABLED
+        else {"pool_size": 10, "max_overflow": 20, "pool_recycle": 1800}
+    ),
 )
 
 

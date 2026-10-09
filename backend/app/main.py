@@ -119,11 +119,7 @@ def create_app() -> FastAPI:
         # Replace with your actual prod hostnames.
         app.add_middleware(
             TrustedHostMiddleware,
-            allowed_hosts=[
-                "api.secureshop.example",
-                "secureshop.example",
-                "*.onrender.com",
-            ],
+            allowed_hosts=settings.allowed_hosts_list,
         )
 
     # --- Routes ---
