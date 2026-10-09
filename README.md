@@ -6,7 +6,7 @@
 [![Security](https://img.shields.io/badge/Security-OWASP%20Top%2010-green)](https://owasp.org/)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#run-with-docker)
 
-**Live:** [Storefront](https://secureshop-l35h.onrender.com) · [API Live](https://secureshop-api-zckt.onrender.com/) · [Products API](https://secureshop-api-zckt.onrender.com/api/v1/products) · [API Health](https://secureshop-api-zckt.onrender.com/api/v1/health)
+**Live:** [Storefront](https://secureshop-storefront.vercel.app) · [Live API](https://secureshop-api.vercel.app/api/reference) · [Products API](https://secureshop-api.vercel.app/api/v1/products) · [API Health](https://secureshop-api.vercel.app/api/v1/health)
 
 A production-style e-commerce platform with a Python/FastAPI backend, a
 React/TypeScript frontend, and a security model aligned with the OWASP
@@ -16,14 +16,14 @@ full-stack patterns with a strong AI/Python backend stack.
 > **Note:** This is a portfolio project. Schema, products, and demo data
 > are synthetic.
 >
-> **Live demo:** <https://secureshop-l35h.onrender.com>  
-> **Products API:** <https://secureshop-api-zckt.onrender.com/api/v1/products>
+> **Live demo:** <https://secureshop-storefront.vercel.app>  
+> **Products API:** <https://secureshop-api.vercel.app/api/v1/products>
 
 ## Live deployment
 
-- **Storefront:** <https://secureshop-l35h.onrender.com>
-- **Products API:** <https://secureshop-api-zckt.onrender.com/api/v1/products>
-- **API health:** <https://secureshop-api-zckt.onrender.com/api/v1/health>
+- **Storefront:** <https://secureshop-storefront.vercel.app>
+- **Products API:** <https://secureshop-api.vercel.app/api/v1/products>
+- **API health:** <https://secureshop-api.vercel.app/api/v1/health>
 
 The public deployment uses a Render static site for the React frontend, a Render
 FastAPI service, managed Neon PostgreSQL, and a Render Key Value service. Stripe
@@ -33,8 +33,8 @@ live payments and email delivery are not enabled for the portfolio demo.
 
 ## Public deployment
 
-- **Storefront:** <https://secureshop-l35h.onrender.com>
-- **API health:** <https://secureshop-api-zckt.onrender.com/api/v1/health>
+- **Storefront:** <https://secureshop-storefront.vercel.app>
+- **API health:** <https://secureshop-api.vercel.app/api/v1/health>
 
 The portfolio deployment uses a Render static frontend, a Render FastAPI service,
 and Neon PostgreSQL. Alembic applies the schema and seeds a small synthetic demo
