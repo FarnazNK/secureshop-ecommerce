@@ -25,8 +25,9 @@ full-stack patterns with a strong AI/Python backend stack.
 - **Products API:** <https://secureshop-api.vercel.app/api/v1/products>
 - **API health:** <https://secureshop-api.vercel.app/api/v1/health>
 
-The public deployment uses a Render static site for the React frontend, a Render
-FastAPI service, managed Neon PostgreSQL, and a Render Key Value service. Stripe
+The public deployment uses Vercel Hobby for the React frontend and FastAPI
+service, with managed Neon PostgreSQL. The frontend proxies `/api/*` to the API
+on the same origin; the current rate limiter is process-local. Stripe
 live payments and email delivery are not enabled for the portfolio demo.
 
 ---
@@ -36,7 +37,7 @@ live payments and email delivery are not enabled for the portfolio demo.
 - **Storefront:** <https://secureshop-storefront.vercel.app>
 - **API health:** <https://secureshop-api.vercel.app/api/v1/health>
 
-The portfolio deployment uses a Render static frontend, a Render FastAPI service,
+The portfolio deployment uses a Vercel Hobby static frontend and FastAPI service,
 and Neon PostgreSQL. Alembic applies the schema and seeds a small synthetic demo
 catalog. Stripe remains optional/test-oriented; no real card data is stored by
 the application.
@@ -47,7 +48,7 @@ the application.
 - FastAPI 0.115+ with async route handlers
 - SQLAlchemy 2.0 async ORM over PostgreSQL (asyncpg driver)
 - Alembic for schema migrations
-- Redis/Key Value is provisioned for shared cache/rate-limit state; the current limiter remains process-local
+- Redis support is included in the local deployment scaffolding; the hosted limiter remains process-local
 - Pydantic v2 for request/response validation
 - PyJWT + bcrypt for JWT and password hashing
 - slowapi for rate limiting
