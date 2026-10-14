@@ -19,11 +19,16 @@ full-stack patterns with a strong AI/Python backend stack.
 > **Live demo:** <https://secureshop-storefront.vercel.app>  
 > **Products API:** <https://secureshop-api.vercel.app/api/v1/products>
 
-## Live deployment
+## Live deployment — start here
 
-- **Storefront:** <https://secureshop-storefront.vercel.app>
-- **Products API:** <https://secureshop-api.vercel.app/api/v1/products>
-- **API health:** <https://secureshop-api.vercel.app/api/v1/health>
+- **Open the storefront:** <https://secureshop-storefront.vercel.app>
+- **Browse the demo catalog:** <https://secureshop-storefront.vercel.app/products>
+- **Inspect product data:** <https://secureshop-api.vercel.app/api/v1/products>
+- **Check API health:** <https://secureshop-api.vercel.app/api/v1/health>
+
+The storefront should display a synthetic product catalog without signing in. Login,
+cart, and order features need an account; live payment processing is disabled.
+A page loading by itself does not verify catalog data or checkout.
 
 The public deployment uses Vercel Hobby for the React frontend and FastAPI
 service, with managed Neon PostgreSQL. The frontend proxies `/api/*` to the API
@@ -31,16 +36,6 @@ on the same origin; the current rate limiter is process-local. Stripe
 live payments and email delivery are not enabled for the portfolio demo.
 
 ---
-
-## Public deployment
-
-- **Storefront:** <https://secureshop-storefront.vercel.app>
-- **API health:** <https://secureshop-api.vercel.app/api/v1/health>
-
-The portfolio deployment uses a Vercel Hobby static frontend and FastAPI service,
-and Neon PostgreSQL. Alembic applies the schema and seeds a small synthetic demo
-catalog. Stripe remains optional/test-oriented; no real card data is stored by
-the application.
 
 ## Stack
 
