@@ -15,12 +15,15 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
-from prometheus_client import Counter, Histogram, CONTENT_TYPE_LATEST, generate_latest
-from fastapi.responses import Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
-METRIC_REQUESTS = Counter('secureshop_http_requests_total', 'HTTP requests', ['method', 'route', 'status'])
-METRIC_DURATION = Histogram('secureshop_http_duration_seconds', 'HTTP latency', ['method', 'route'])
+METRIC_REQUESTS = Counter(
+    'secureshop_http_requests_total', 'HTTP requests', ['method', 'route', 'status']
+)
+METRIC_DURATION = Histogram(
+    'secureshop_http_duration_seconds', 'HTTP latency', ['method', 'route']
+)
 
 from app.api.v1 import api_router
 from app.api_reference import render_api_reference
