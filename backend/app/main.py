@@ -26,11 +26,9 @@ from app.middleware.request_logging import RequestLoggingMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 
 METRIC_REQUESTS = Counter(
-    'secureshop_http_requests_total', 'HTTP requests', ['method', 'route', 'status']
+    "secureshop_http_requests_total", "HTTP requests", ["method", "route", "status"]
 )
-METRIC_DURATION = Histogram(
-    'secureshop_http_duration_seconds', 'HTTP latency', ['method', 'route']
-)
+METRIC_DURATION = Histogram("secureshop_http_duration_seconds", "HTTP latency", ["method", "route"])
 
 log = get_logger(__name__)
 
