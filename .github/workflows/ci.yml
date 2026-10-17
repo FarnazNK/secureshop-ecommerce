@@ -80,6 +80,12 @@ jobs:
       - name: Run tests with coverage
         run: pytest --cov=app --cov-report=xml --cov-report=term -ra
 
+      - name: AgentCore security regression tests
+        run: pytest ../aws_agentcore/test_agentcore_readonly.py -q
+
+      - name: Offline AgentCore portfolio demo
+        run: python ../aws_agentcore/demo_offline.py
+
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
