@@ -3,6 +3,7 @@
 Do not expose runtime ARN to browsers, accept an ARN from clients, or send
 credentials, payments, or unverified tenant data to model providers.
 """
+
 from __future__ import annotations
 
 import json
