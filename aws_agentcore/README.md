@@ -11,3 +11,7 @@ This directory contains a **read-only AgentCore invocation adapter**. It does no
 5. Keep orders, refunds, payments, holdings changes, investment execution, and administrative changes outside the agent. Human-authorized application routes continue to own all transactions.
 6. Tests: `python -m pytest aws_agentcore/test_agentcore_readonly.py -q`. Mock tests **do not** verify a live AWS runtime.
 7. No AWS deployment or actual end-to-end API route is provided here. Production use requires provider runtime validation, service-side authorization wiring and cross-tenant adversarial tests.
+
+## SecureShop API integration
+
+The read-only `POST /api/v1/agentcore/products/ask` endpoint is registered but returns 404 unless `SECURESHOP_ENABLE_AGENTCORE=true`. It requires a verified bearer-token user, retrieves only active public catalog product names and short descriptions server-side, and sends no customer records, orders, prices, payments, credentials or administrative data to the model. `AGENTCORE_RUNTIME_ARN` and temporary AWS credentials must be set server-side. The backend environment must include the reviewed `boto3` package before enabling the endpoint. The application-level rate limiter is process-local, so enforce a shared quota/API gateway rate limit before traffic. Staging threat modeling and AWS IAM/guardrail deployment are still mandatory.
