@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
-from app.agentcore_readonly import AgentCoreUnavailable, invoke_readonly_agent
+from app.agentcore_readonly import AgentCoreUnavailableError, invoke_readonly_agent
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.product import Product
@@ -55,6 +55,6 @@ async def ask_about_products(
             authorized=True,
             tenant_id=str(user.id),
         )
-    except AgentCoreUnavailable:
+    except AgentCoreUnavailableError:
         raise HTTPException(status_code=503, detail="Assistant unavailable") from None
     return {"answer": answer}
