@@ -1,4 +1,5 @@
 """Authenticated, read-only product-assistance endpoint (disabled by default)."""
+
 from __future__ import annotations
 
 import os
