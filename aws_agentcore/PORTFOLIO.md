@@ -21,3 +21,13 @@ These tests use a fake AgentCore client. They verify denial without authorizatio
 - Actual deployment would require IAM least privilege, AWS Bedrock Guardrails, cloud audit logs, budgets, and an end-to-end staging assessment.
 
 **Honest limitation:** Passing mocked tests demonstrates local integration design and trust-boundary checks, not production security certification.
+
+## One-command offline demo
+
+From the repository root:
+
+```bash
+python aws_agentcore/demo_offline.py
+```
+
+The demo uses fake model/runtime objects and mock response streams. This command needs only Python and does **not** contact AWS. CI executes the same command to prevent demo regressions.
