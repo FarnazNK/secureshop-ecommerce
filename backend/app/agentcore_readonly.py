@@ -11,7 +11,7 @@ import uuid
 from typing import Any
 
 
-class AgentCoreUnavailable(RuntimeError):
+class AgentCoreUnavailableError(RuntimeError):
     """Generic, safe-to-return error with no provider details."""
 
 
@@ -32,7 +32,7 @@ def invoke_readonly_agent(
         raise ValueError("Invalid context")
     runtime_arn = os.environ.get("AGENTCORE_RUNTIME_ARN", "")
     if not runtime_arn.startswith("arn:aws:bedrock-agentcore:"):
-        raise AgentCoreUnavailable("Agent runtime is not configured")
+        raise AgentCoreUnavailableError("Agent runtime is not configured")
     if client is None:
         import boto3
 
@@ -46,14 +46,14 @@ def invoke_readonly_agent(
         )
         # Runtime returns a bounded JSON body; never expose raw SDK exceptions.
         if response.get("statusCode", 200) != 200:
-            raise AgentCoreUnavailable("Agent invocation failed")
+            raise AgentCoreUnavailableError("Agent invocation failed")
         body = response["response"]
         raw = body.read(16001) if hasattr(body, "read") else body
         if len(raw) > 16000:
-            raise AgentCoreUnavailable("Agent response exceeded limit")
+            raise AgentCoreUnavailableError("Agent response exceeded limit")
         result = json.loads(raw)
         if not isinstance(result, dict) or not isinstance(result.get("answer"), str):
-            raise AgentCoreUnavailable("Invalid agent response")
+            raise AgentCoreUnavailableError("Invalid agent response")
         return result["answer"][:12000]
     except Exception:
-        raise AgentCoreUnavailable("Agent invocation failed") from None
+        raise AgentCoreUnavailableError("Agent invocation failed") from None
