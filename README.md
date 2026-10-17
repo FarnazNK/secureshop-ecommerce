@@ -1,5 +1,18 @@
 # SecureShop — Secure E-Commerce Platform (FastAPI Edition)
 
+## AWS AgentCore — free portfolio demo
+
+This project includes an **optional, disabled-by-default** authenticated product-catalog assistant using a server-side AgentCore adapter. Its read-only context is restricted to active public product names and short descriptions; **orders, payment data and account records are not exposed** to the agent. The hosted storefront and API do not run AWS AgentCore by default.
+
+Run the mock-only local demonstration (no AWS credentials or billing):
+
+```bash
+python aws_agentcore/demo_offline.py
+```
+
+Tests: `python -m pytest aws_agentcore/test_agentcore_readonly.py -q` (with backend test dependencies). See [`aws_agentcore/PORTFOLIO.md`](aws_agentcore/PORTFOLIO.md) for architecture, safety constraints and known limitations. Actual AWS deployment and live security verification have not been performed.
+
+
 [![ci](https://github.com/FarnazNK/secureshop-ecommerce/actions/workflows/ci.yml/badge.svg)](https://github.com/FarnazNK/secureshop-ecommerce/actions)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi)](https://fastapi.tiangolo.com)
