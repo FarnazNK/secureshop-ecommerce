@@ -1,5 +1,12 @@
 # SecureShop — Secure E-Commerce Platform (FastAPI Edition)
 
+## Kubernetes container orchestration (free local demo)
+
+The Docker images for SecureShop can also be managed with **Kubernetes on your laptop using kind**. This is optional: Docker Compose and the existing APIs continue to work as before. The `k8s/local.yaml` example defines Kubernetes Deployments and internal ClusterIP Services, a local PostgreSQL persistent volume, resource limits, and external runtime-generated Secret references. No AWS account, managed Kubernetes service, or paid cloud resource is needed.
+
+Follow the setup and cleanup instructions in **[k8s/README.md](k8s/README.md)**. Kubernetes manifests are checked by a dedicated GitHub Actions validation workflow. This is a **local demonstration**, not a tested production or public cluster deployment.
+
+
 ## AWS AgentCore — free portfolio demo
 
 This project includes an **optional, disabled-by-default** authenticated product-catalog assistant using a server-side AgentCore adapter. Its read-only context is restricted to active public product names and short descriptions; **orders, payment data and account records are not exposed** to the agent. The hosted storefront and API do not run AWS AgentCore by default.
