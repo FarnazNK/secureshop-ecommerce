@@ -34,18 +34,19 @@ async def ask_about_products(
         raise HTTPException(status_code=404, detail="Not found")
     # Only public, active catalog data is available to this agent. No user,
     # cart, order, payment, credential, or administrative data is included.
-    records = (
-        await db.execute(
-            select(Product)
-            .where(Product.is_active.is_(True))
-            .order_by(Product.created_at.desc())
-            .limit(20)
-        )
-    ).scalars().all()
-    context = "\n".join(
-        f"Product: {p.name[:200]}; {str(p.short_description or '')[:300]}"
-        for p in records
-    )[:12000]
+    statement = (
+        select(Product)
+        .where(Product.is_active.is_(True))
+        .order_by(Product.created_at.desc())
+        .limit(20)
+    )
+    records = (await db.execute(statement)).scalars().all()
+    snippets = []
+    for product in records:
+        name = product.name[:200]
+        description = str(product.short_description or "")[:300]
+        snippets.append(f"Product: {name}; {description}")
+    context = "\n".join(snippets)[:12000]
     if not context:
         return {"answer": "No products are available."}
     try:
