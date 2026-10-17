@@ -16,6 +16,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+from prometheus_client import Counter, Histogram, CONTENT_TYPE_LATEST, generate_latest
+from fastapi.responses import Response
+
+METRIC_REQUESTS = Counter('secureshop_http_requests_total', 'HTTP requests', ['method', 'route', 'status'])
+METRIC_DURATION = Histogram('secureshop_http_duration_seconds', 'HTTP latency', ['method', 'route'])
 
 from app.api.v1 import api_router
 from app.api_reference import render_api_reference
@@ -92,6 +97,17 @@ def create_app() -> FastAPI:
             return _rate_limit_response(retry_after)
         events.append(now)
         return await call_next(request)
+
+    @app.middleware("http")
+    async def metrics_middleware(request: Request, call_next):
+        if request.url.path == "/metrics":
+            return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+        started = time.monotonic()
+        response = await call_next(request)
+        route = getattr(request.scope.get("route"), "path", "unmatched")
+        METRIC_REQUESTS.labels(request.method, route, str(response.status_code)).inc()
+        METRIC_DURATION.labels(request.method, route).observe(time.monotonic() - started)
+        return response
 
     # --- Compression ---
     app.add_middleware(GZipMiddleware, minimum_size=1024)
