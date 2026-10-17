@@ -19,4 +19,6 @@ jobs:
       - name: Install YAML parser
         run: python -m pip install 'pyyaml>=6,<7'
       - name: Validate demo deployments, services, and security constraints
-        run: python k8s/validate.py
+        run: |
+          python k8s/validate.py
+          python k8s/validate_monitoring.py
