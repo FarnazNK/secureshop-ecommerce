@@ -45,7 +45,9 @@ def invoke_readonly_agent(
             qualifier="DEFAULT",
         )
         # Runtime returns a bounded JSON body; never expose raw SDK exceptions.
-        if response.get("statusCode", 200) != 200:\n            raise AgentCoreUnavailable("Agent invocation failed")\n        body = response["response"]
+        if response.get("statusCode", 200) != 200:
+            raise AgentCoreUnavailable("Agent invocation failed")
+        body = response["response"]
         raw = body.read(16001) if hasattr(body, "read") else body
         if len(raw) > 16000:
             raise AgentCoreUnavailable("Agent response exceeded limit")
