@@ -18,19 +18,19 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
-METRIC_REQUESTS = Counter(
-    'secureshop_http_requests_total', 'HTTP requests', ['method', 'route', 'status']
-)
-METRIC_DURATION = Histogram(
-    'secureshop_http_duration_seconds', 'HTTP latency', ['method', 'route']
-)
-
 from app.api.v1 import api_router
 from app.api_reference import render_api_reference
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.middleware.request_logging import RequestLoggingMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
+
+METRIC_REQUESTS = Counter(
+    'secureshop_http_requests_total', 'HTTP requests', ['method', 'route', 'status']
+)
+METRIC_DURATION = Histogram(
+    'secureshop_http_duration_seconds', 'HTTP latency', ['method', 'route']
+)
 
 log = get_logger(__name__)
 
