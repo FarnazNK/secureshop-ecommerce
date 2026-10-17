@@ -41,3 +41,70 @@ def test_missing_runtime_fails_closed(monkeypatch):
     monkeypatch.delenv("AGENTCORE_RUNTIME_ARN", raising=False)
     with pytest.raises(m.AgentCoreUnavailable):
         m.invoke_readonly_agent(prompt="x", context="y", authorized=True, tenant_id="a", client=FakeClient())
+
+
+@pytest.mark.parametrize(
+    "prompt, context",
+    [("", "data"), ("x" * 4001, "data"), ("ok", "x" * 12001)],
+)
+def test_invalid_request_rejected_before_client_call(monkeypatch, prompt, context):
+    monkeypatch.setenv(
+        "AGENTCORE_RUNTIME_ARN",
+        "arn:aws:bedrock-agentcore:us-east-1:123:runtime/test",
+    )
+    client = FakeClient()
+    with pytest.raises(ValueError):
+        m.invoke_readonly_agent(
+            prompt=prompt,
+            context=context,
+            authorized=True,
+            tenant_id="test",
+            client=client,
+        )
+    assert not client.calls
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        {"statusCode": 403, "response": BytesIO(b"AccessDenied")},
+        {"statusCode": 200, "response": BytesIO(b"invalid json")},
+        {"statusCode": 200, "response": BytesIO(b'{"answer": 1}')},
+        {"statusCode": 200, "response": BytesIO(b"x" * 16001)},
+    ],
+)
+def test_provider_failures_are_sanitized(monkeypatch, response):
+    monkeypatch.setenv(
+        "AGENTCORE_RUNTIME_ARN",
+        "arn:aws:bedrock-agentcore:us-east-1:123:runtime/test",
+    )
+
+    class BadClient:
+        def invoke_agent_runtime(self, **kwargs):
+            return response
+
+    with pytest.raises(m.AgentCoreUnavailable, match="Agent invocation failed"):
+        m.invoke_readonly_agent(
+            prompt="question",
+            context="safe text",
+            authorized=True,
+            tenant_id="test",
+            client=BadClient(),
+        )
+
+
+def test_missing_user_scope_rejected_before_client_call(monkeypatch):
+    monkeypatch.setenv(
+        "AGENTCORE_RUNTIME_ARN",
+        "arn:aws:bedrock-agentcore:us-east-1:123:runtime/test",
+    )
+    client = FakeClient()
+    with pytest.raises(PermissionError):
+        m.invoke_readonly_agent(
+            prompt="question",
+            context="safe text",
+            authorized=True,
+            tenant_id="",
+            client=client,
+        )
+    assert not client.calls
