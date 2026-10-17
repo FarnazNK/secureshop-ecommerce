@@ -135,7 +135,7 @@ cp .env.example .env
 
 make migrate      # apply schema
 make serve        # uvicorn --reload on :3001
-make test         # 23 unit tests
+make test         # unit tests + async cart database test
 make lint         # ruff check + format check
 ```
 
@@ -204,7 +204,7 @@ secureshop-fastapi/
 │   │   └── versions/
 │   │       ├── 0001_initial.py
 │   │       └── 0002_demo_catalog.py
-│   ├── tests/                       # 23 unit tests (security, schemas, config)
+│   ├── tests/                       # security, schemas, config, async cart database test
 │   ├── Dockerfile                   # multi-stage, non-root, tini, healthcheck
 │   ├── Makefile                     # one-line entry points
 │   ├── alembic.ini
