@@ -17,6 +17,10 @@ spec:
       - name: postgres
         image: postgres:16-alpine
         imagePullPolicy: IfNotPresent
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "secureshop"]
+          periodSeconds: 5
         ports:
         - containerPort: 5432
         env:
@@ -74,6 +78,10 @@ spec:
       - name: redis
         image: redis:7-alpine
         imagePullPolicy: IfNotPresent
+        readinessProbe:
+          exec:
+            command: ["redis-cli", "ping"]
+          periodSeconds: 5
         ports:
         - containerPort: 6379
         resources:
