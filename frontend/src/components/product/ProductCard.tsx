@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
-import { Heart, ShoppingBag } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { ShoppingBag } from 'lucide-react';
 import { useState } from 'react';
+import type { MouseEvent } from 'react';
 import { cn } from '../../utils/cn';
 import { useCart } from '../../context/CartContext';
 
@@ -21,16 +21,14 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, priority = false }: ProductCardProps) {
-  const [isHovered, setIsHovered] = useState(false);
-  const [isWishlisted, setIsWishlisted] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const { addItem } = useCart();
 
-  const discount = product.compareAtPrice
+  const discount = product.compareAtPrice && product.compareAtPrice > product.price
     ? Math.round((1 - product.price / product.compareAtPrice) * 100)
     : null;
 
-  const handleAddToCart = async (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsAddingToCart(true);
@@ -41,23 +39,11 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
     }
   };
 
-  const handleWishlist = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsWishlisted(!isWishlisted);
-  };
-
   return (
-    <Link
-      to={`/products/${product.slug}`}
-      className="group block"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <article className="product-card">
+    <article className="product-card group relative h-full flex flex-col overflow-hidden rounded-2xl border border-ink-100 bg-white transition-shadow duration-200 hover:shadow-lg focus-within:ring-2 focus-within:ring-accent-500">
         {/* Image container */}
         <div className="product-card-image relative">
-          {/* Placeholder for actual image */}
+          {/* Product photography with graceful fallback */}
           <div className="w-full h-full bg-gradient-to-br from-sand-100 to-sand-200 flex items-center justify-center">
             {product.images?.[0]?.url ? (
               <img
@@ -80,51 +66,34 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
             )}
           </div>
 
-          {/* Quick actions */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: isHovered ? 1 : 0 }}
-            className="absolute top-3 right-3 flex flex-col gap-2"
-          >
-            <button
-              onClick={handleWishlist}
-              className={cn(
-                'w-9 h-9 flex items-center justify-center rounded-full bg-white shadow-soft transition-colors',
-                isWishlisted ? 'text-primary-500' : 'text-ink-400 hover:text-primary-500'
-              )}
-              aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-            >
-              <Heart className={cn('w-4 h-4', isWishlisted && 'fill-current')} />
-            </button>
-          </motion.div>
-
+          {/* Primary product link is a stretched, accessible link. Actions are siblings, not nested buttons. */}
           {/* Add to cart button */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: isHovered ? 1 : 0, y: isHovered ? 0 : 10 }}
-            className="absolute bottom-3 left-3 right-3"
-          >
+          <div className="absolute bottom-3 left-3 right-3 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
             <button
+              type="button"
               onClick={handleAddToCart}
               disabled={isAddingToCart}
-              className="w-full btn bg-white text-ink-900 shadow-soft hover:bg-sand-50"
+              aria-label={`Add ${product.name} to cart`}
+              className="relative z-10 w-full btn bg-white text-ink-900 shadow-soft hover:bg-sand-50 focus-visible:ring-2 focus-visible:ring-accent-500 disabled:opacity-50"
             >
-              <ShoppingBag className="w-4 h-4" />
+              <ShoppingBag className="w-4 h-4" aria-hidden="true" />
               {isAddingToCart ? 'Adding...' : 'Add to Cart'}
             </button>
-          </motion.div>
+          </div>
         </div>
 
         {/* Product info */}
-        <div className="p-4">
+        <div className="p-4 flex-1">
           {product.category && (
             <p className="text-body-xs text-ink-400 uppercase tracking-wide mb-1">
               {product.category.name}
             </p>
           )}
           
-          <h3 className="text-body-md font-medium text-ink-900 mb-2 line-clamp-1 group-hover:text-primary-600 transition-colors">
-            {product.name}
+          <h3 className="text-body-md font-medium text-ink-900 mb-2 line-clamp-2 group-hover:text-primary-600 transition-colors">
+            <Link to={`/products/${product.slug}`} className="after:absolute after:inset-0 focus-visible:outline-none">
+              {product.name}
+            </Link>
           </h3>
 
           <div className="flex items-center gap-2">
@@ -141,7 +110,6 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
             )}
           </div>
         </div>
-      </article>
-    </Link>
+    </article>
   );
 }
