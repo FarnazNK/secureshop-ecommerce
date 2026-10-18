@@ -40,7 +40,7 @@ export function ProductsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Get current filters from URL
-  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  const currentPage = Math.max(1, Number.parseInt(searchParams.get('page') || '1', 10) || 1);
   const currentCategory = searchParams.get('category') || '';
   const currentSort = searchParams.get('sort') || 'newest';
   const currentSearch = searchParams.get('search') || '';
@@ -160,9 +160,10 @@ export function ProductsPage() {
   return (
     <div className="min-h-screen bg-sand-50">
       {/* Header */}
-      <div className="bg-ink-900 text-white py-16">
+      <div className="bg-ink-900 text-white py-12 md:py-20">
         <div className="container-page">
-          <h1 className="text-display-lg font-display mb-4">Shop All Products</h1>
+          <p className="text-accent-300 text-sm font-semibold tracking-[0.2em] uppercase mb-4">SecureShop / Catalog</p>
+          <h1 className="text-display-lg font-display mb-4">Explore the collection.</h1>
           <p className="text-ink-300 text-lg max-w-2xl">
             Discover our curated collection of premium products, crafted with care and designed to elevate your everyday.
           </p>
@@ -251,6 +252,16 @@ export function ProductsPage() {
 
           {/* Product Grid */}
           <section aria-label="Product results" aria-busy={loading} className="flex-1">
+            {(currentCategory || currentSearch || minPrice || maxPrice) && (
+              <div className="mb-6 flex flex-wrap items-center gap-2" aria-label="Active filters">
+                <span className="text-xs font-semibold uppercase tracking-widest text-ink-500">Active filters</span>
+                {currentSearch && <span className="rounded-full bg-white border border-ink-200 px-3 py-1 text-sm">Search: {currentSearch}</span>}
+                {currentCategory && <span className="rounded-full bg-white border border-ink-200 px-3 py-1 text-sm">Category: {categories.find(cat => cat.id === currentCategory)?.name ?? 'Selected'}</span>}
+                {minPrice && <span className="rounded-full bg-white border border-ink-200 px-3 py-1 text-sm">From ${minPrice}</span>}
+                {maxPrice && <span className="rounded-full bg-white border border-ink-200 px-3 py-1 text-sm">Up to ${maxPrice}</span>}
+                <button type="button" onClick={() => setSearchParams(new URLSearchParams())} className="rounded-full px-3 py-1 text-sm font-semibold text-primary-600 underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-accent-500">Clear all</button>
+              </div>
+            )}
             {/* Sort & Results Count */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
               <p className="text-ink-600">
