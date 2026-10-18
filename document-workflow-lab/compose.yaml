@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: workflow
+    ports:
+      - '5432:5432'
+    volumes:
+      - workflow-data:/var/lib/postgresql/data
+      - ./sql/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+volumes:
+  workflow-data:
