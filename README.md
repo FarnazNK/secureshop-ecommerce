@@ -1,5 +1,18 @@
 # SecureShop — Secure E-Commerce Platform (FastAPI Edition)
 
+> **SecureShop at a glance:** A customer-facing React/TypeScript e-commerce storefront with API-backed product browsing, catalog search/filter/sort, product details, cart and account flows, supported by a security-focused FastAPI/PostgreSQL backend.
+>
+> **Try it:** [Live storefront](https://secureshop-storefront.vercel.app) · [Catalog](https://secureshop-storefront.vercel.app/products) · [API reference](https://secureshop-api.vercel.app/api/reference) · [Frontend source](frontend/src/) · [Backend source](backend/)
+>
+> **Frontend engineering:** Responsive catalog and product cards, URL-driven filters and sorting, asynchronous loading/error/empty states, accessible navigation and shopping actions, React Router and Tailwind CSS.
+>
+> **Backend engineering:** JWT access/refresh authentication, role-aware authorization, refresh-token rotation, request validation, rate limiting, SQLAlchemy/PostgreSQL order models and price snapshots.
+>
+> **Demo boundaries:** Catalog data is synthetic. Checkout/payment processing and email delivery are not live. The storefront is a shopping experience; implementation details belong in this README.
+>
+> **Where to look:** `frontend/src/pages/HomePage.tsx` (API-backed homepage), `frontend/src/pages/ProductsPage.tsx` (catalog), `frontend/src/components/product/ProductCard.tsx` (shopping interactions), `backend/app/` (services and security).
+
+
 ## Prometheus & Grafana — free local monitoring
 
 The optional [Prometheus and Grafana Kubernetes add-on](k8s/MONITORING.md) collects application HTTP metrics and provides dashboards on a **localhost-only kind cluster**, with no AWS costs. Prometheus and Grafana run as private ClusterIP Services, and Grafana's admin password is created as a Kubernetes Secret. CI validates the manifests; this is a locally runnable portfolio setup, **not** a live production monitoring deployment.
