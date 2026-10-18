@@ -1,13 +1,16 @@
 {
-  "name": "document-workflow-lab",
-  "version": "1.0.0",
+  "name": "atlas-review",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "concurrently -k \"tsx watch src/server/index.ts\" \"vite --host 0.0.0.0\"",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "start": "tsx src/server/index.ts"
+    "start": "NODE_ENV=production tsx src/server/index.ts"
   },
   "dependencies": {
     "@trpc/client": "^11.0.0",
