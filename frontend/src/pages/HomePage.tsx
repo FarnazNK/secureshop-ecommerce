@@ -1,79 +1,114 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ShoppingBag, Search, Heart, ShieldCheck } from 'lucide-react';
+import { ArrowRight, ShoppingBag } from 'lucide-react';
+import { ProductCard } from '../components/product/ProductCard';
+import { api } from '../utils/api';
 
-/**
- * Customer-first storefront. Technical implementation belongs in the repository,
- * not in the shopping journey.
- */
+interface FeaturedProduct {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  compareAtPrice?: number;
+  images: { url: string; alt?: string }[];
+  category?: { name: string; slug: string };
+}
+
 export function HomePage() {
+  const [products, setProducts] = useState<FeaturedProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api.get('/products?limit=8&page=1')
+      .then(({ data }) => {
+        if (!active) return;
+        setProducts((data.items ?? []).map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          slug: item.slug,
+          price: Number(item.price),
+          compareAtPrice: item.compare_at_price != null ? Number(item.compare_at_price) : undefined,
+          images: item.images ?? [],
+          category: item.category ?? undefined,
+        })));
+      })
+      .catch(() => { if (active) setError(true); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
   return (
     <main className="min-h-screen bg-sand-50">
       <section className="relative overflow-hidden border-b border-sand-200 bg-gradient-to-br from-sand-50 via-white to-primary-50">
-        <div className="container-page grid gap-12 py-16 md:py-24 lg:grid-cols-2 lg:items-center">
+        <div className="container-page grid gap-10 py-16 md:py-24 lg:grid-cols-2 lg:items-center">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary-700">Welcome to SecureShop</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary-700">SecureShop / The collection</p>
             <h1 className="mt-5 max-w-2xl font-display text-display-lg leading-tight text-ink-900 md:text-display-xl">
-              Good things, thoughtfully chosen.
+              Find something worth keeping.
             </h1>
             <p className="mt-6 max-w-xl text-body-xl leading-relaxed text-ink-600">
-              Discover everyday favorites in a clean, easy-to-shop collection. Find what you love, explore the details, and shop with confidence.
+              Thoughtful essentials for everyday life. Browse the collection, discover your favorites, and make them yours.
             </p>
             <div className="mt-9 flex flex-wrap gap-4">
               <Link to="/products" className="btn-primary inline-flex items-center gap-2">
-                Shop the collection <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                Shop all products <ArrowRight aria-hidden="true" className="h-4 w-4" />
               </Link>
               <Link to="/cart" className="btn-secondary inline-flex items-center gap-2">
-                View your bag <ShoppingBag aria-hidden="true" className="h-4 w-4" />
+                Your bag <ShoppingBag aria-hidden="true" className="h-4 w-4" />
               </Link>
             </div>
-            <p className="mt-6 max-w-xl text-sm text-ink-500">
-              Demo storefront with sample products. No real payments are processed.
-            </p>
           </div>
-          <div className="relative overflow-hidden rounded-3xl bg-ink-900 p-8 text-white shadow-elevated md:p-12">
-            <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-primary-500/20 blur-3xl" aria-hidden="true" />
-            <div className="relative">
-              <p className="text-sm font-semibold uppercase tracking-widest text-primary-300">Made for discovering</p>
-              <h2 className="mt-5 max-w-sm font-display text-display-md leading-tight">Find your next favorite.</h2>
-              <p className="mt-5 max-w-sm leading-relaxed text-sand-300">A little inspiration goes a long way. Browse the collection and see what catches your eye.</p>
-              <div className="mt-10 grid grid-cols-2 gap-3">
-                <Link to="/products" className="group flex min-h-32 flex-col justify-between rounded-2xl bg-white/10 p-5 transition-colors hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
-                  <Search aria-hidden="true" className="h-7 w-7" />
-                  <span className="flex items-center justify-between font-semibold">Explore products <ArrowRight aria-hidden="true" className="h-4 w-4 transition-transform group-hover:translate-x-1" /></span>
-                </Link>
-                <Link to="/cart" className="group flex min-h-32 flex-col justify-between rounded-2xl bg-white/10 p-5 transition-colors hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
-                  <ShoppingBag aria-hidden="true" className="h-7 w-7" />
-                  <span className="flex items-center justify-between font-semibold">Your shopping bag <ArrowRight aria-hidden="true" className="h-4 w-4 transition-transform group-hover:translate-x-1" /></span>
-                </Link>
-              </div>
-            </div>
+          <div className="grid grid-cols-2 gap-3" aria-label="Explore the store">
+            <Link to="/products?sort=newest" className="group relative flex min-h-64 flex-col justify-end overflow-hidden rounded-3xl bg-ink-900 p-6 text-white transition-transform hover:-translate-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
+              <span className="mb-auto text-xs font-semibold uppercase tracking-widest text-sand-300">Discover</span>
+              <span className="font-display text-2xl">New arrivals</span>
+              <ArrowRight aria-hidden="true" className="mt-3 h-5 w-5 transition-transform group-hover:translate-x-1" />
+            </Link>
+            <Link to="/products?sort=price-low" className="group relative mt-8 flex min-h-64 flex-col justify-end overflow-hidden rounded-3xl bg-primary-100 p-6 text-ink-900 transition-transform hover:-translate-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
+              <span className="mb-auto text-xs font-semibold uppercase tracking-widest text-primary-700">Explore</span>
+              <span className="font-display text-2xl">Everyday finds</span>
+              <ArrowRight aria-hidden="true" className="mt-3 h-5 w-5 transition-transform group-hover:translate-x-1" />
+            </Link>
           </div>
         </div>
       </section>
-      <section className="section bg-white" aria-labelledby="discover-heading">
+      <section className="section bg-white" aria-labelledby="products-heading">
         <div className="container-page">
-          <p className="text-sm font-semibold uppercase tracking-widest text-primary-600">The little details</p>
-          <h2 id="discover-heading" className="mt-2 max-w-2xl font-display text-display-sm text-ink-900 md:text-display-md">A simpler way to shop.</h2>
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
-            <article className="rounded-2xl border border-sand-200 bg-sand-50 p-7">
-              <Search aria-hidden="true" className="h-7 w-7 text-primary-600" />
-              <h3 className="mt-5 text-xl font-semibold text-ink-900">Find it faster</h3>
-              <p className="mt-3 leading-relaxed text-ink-600">Search, filter, and sort the catalog to narrow down what matters to you.</p>
-            </article>
-            <article className="rounded-2xl border border-sand-200 bg-sand-50 p-7">
-              <Heart aria-hidden="true" className="h-7 w-7 text-primary-600" />
-              <h3 className="mt-5 text-xl font-semibold text-ink-900">Explore every detail</h3>
-              <p className="mt-3 leading-relaxed text-ink-600">Take a closer look at products before adding them to your bag.</p>
-            </article>
-            <article className="rounded-2xl border border-sand-200 bg-sand-50 p-7">
-              <ShieldCheck aria-hidden="true" className="h-7 w-7 text-primary-600" />
-              <h3 className="mt-5 text-xl font-semibold text-ink-900">Shop with confidence</h3>
-              <p className="mt-3 leading-relaxed text-ink-600">Clear navigation and a straightforward cart experience from start to finish.</p>
-            </article>
+          <div className="mb-9 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-widest text-primary-600">Browse the edit</p>
+              <h2 id="products-heading" className="mt-2 font-display text-display-sm text-ink-900 md:text-display-md">Explore our products</h2>
+            </div>
+            <Link to="/products" className="inline-flex items-center gap-2 font-semibold text-primary-700 underline underline-offset-4">
+              View all products <ArrowRight aria-hidden="true" className="h-4 w-4" />
+            </Link>
           </div>
-          <Link to="/products" className="mt-10 inline-flex items-center gap-2 font-semibold text-primary-700 underline underline-offset-4">
-            Browse all products <ArrowRight aria-hidden="true" className="h-4 w-4" />
-          </Link>
+          {loading ? (
+            <div aria-label="Loading products" aria-busy="true" className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
+              {Array.from({ length: 4 }, (_, i) => (
+                <div key={i} className="animate-pulse overflow-hidden rounded-2xl border border-sand-200">
+                  <div className="aspect-square bg-sand-100" />
+                  <div className="space-y-3 p-4"><div className="h-4 w-3/4 rounded bg-sand-100" /><div className="h-4 w-1/2 rounded bg-sand-100" /></div>
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div role="status" className="rounded-2xl border border-sand-200 bg-sand-50 p-8 text-center">
+              <p className="text-ink-700">We couldn't load the collection right now.</p>
+              <Link to="/products" className="mt-4 inline-flex font-semibold text-primary-700 underline">Try browsing the catalog</Link>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="rounded-2xl border border-sand-200 bg-sand-50 p-8 text-center">
+              <p className="text-ink-700">New products are on their way.</p>
+              <Link to="/products" className="mt-4 inline-flex font-semibold text-primary-700 underline">Browse the catalog</Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
+              {products.map((product, index) => <ProductCard key={product.id} product={product} priority={index < 2} />)}
+            </div>
+          )}
         </div>
       </section>
     </main>
