@@ -1,25 +1,24 @@
 # Atlas Review
 
-**Full-stack document operations prototype** — an independent portfolio application, with no company affiliation.
+A document operations application built with React, TypeScript, tRPC, Effect and PostgreSQL.
 
-React + TypeScript frontend, tRPC contracts, Effect service layer and PostgreSQL transactional persistence. A single Node.js process serves both the compiled frontend and the live API.
-
-## Implemented
+## Features
 
 - Create and list review work items.
-- Move items through open, review and complete states.
-- Save and review text-only documents (no file uploads).
-- Persist changes to PostgreSQL with transactional audit events.
-- Validate API inputs using Zod and propagate typed Effect service errors.
-- Expose `/healthz` for database readiness.
+- Move items between open, review and complete statuses.
+- Create and review text documents.
+- Store records in PostgreSQL and write audit events transactionally.
+- Validate API input with Zod and handle service failures with Effect.
+- Serve the web interface and API through one Node.js service.
+- Check database availability with `/healthz`.
 
 ## Architecture
 
-Browser → React/tRPC client → Node HTTP server → tRPC/Zod → Effect services → PostgreSQL transaction layer.
+React client → tRPC API → Effect service → PostgreSQL.
 
-## Run locally
+## Local development
 
-Requires Node.js 22+, npm, and Docker Compose.
+Requires Node.js 22+, npm and Docker Compose.
 
 ```sh
 cp .env.example .env
@@ -30,17 +29,17 @@ npm run dev
 
 Open http://localhost:5173.
 
-## Run as a unified deployment
+## Production deployment
 
 ```sh
 npm run build
 npm start
 ```
 
-Open http://localhost:3001. In production, set `DATABASE_URL` and `PORT`. The service initializes the idempotent demo schema at startup.
+Configure `DATABASE_URL` and `PORT`. The Node.js server hosts both the built UI and API. The database schema initializes on startup.
 
-For Render, use root directory `document-workflow-lab`, build command `npm install && npm run build`, start command `npm start`, and a managed PostgreSQL `DATABASE_URL` environment variable. The root deployment manifest is provided as reference.
+For Render, set root directory to `document-workflow-lab`, build command to `npm install && npm run build`, and start command to `npm start`.
 
-## Limitations
+## Current scope
 
-**Prototype, not a production-ready system.** The demo has no authentication, user isolation, OCR, real AI integration, upload pipeline, or production security hardening. It must be used only with synthetic, nonsensitive documents. Do not present unimplemented features as existing. Build/tests and live public endpoint require verification.
+Supports text-only documents. Authentication, user permissions, OCR, uploads and AI processing are not yet implemented. Use synthetic data only. Build, tests and hosted deployment still need validation.
