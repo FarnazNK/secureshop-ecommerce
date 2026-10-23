@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowDownRight, ArrowRight, ShieldCheck, ShoppingBag, Sparkles, Truck } from 'lucide-react';
+import { ArrowDownRight, ArrowRight, ShieldCheck, Sparkles, Truck } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ProductCard } from '../components/product/ProductCard';
 import { api } from '../utils/api';
@@ -66,10 +66,10 @@ export function HomePage() {
           <motion.div initial={reduceMotion ? false : { opacity: 0, y: 35 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .8, ease: 'easeOut' }} className="relative z-10 max-w-2xl">
             <div className="shop-eyebrow"><span className="shop-eyebrow-line" /> THE ART OF FINDING BETTER</div>
             <h1 id="hero-title" className="shop-hero-title mt-7">A little more <em>extraordinary.</em></h1>
-            <p className="shop-hero-copy mt-7 max-w-lg">A curated world of everyday objects, thoughtful details, and things you'll love to live with.</p>
+            <p className="shop-hero-copy mt-7 max-w-lg">A curated world of everyday objects, thoughtful details, and things you&apos;ll love to live with.</p>
             <div className="mt-10 flex flex-wrap items-center gap-4">
               <Link to="/products" className="shop-pill-button">Explore collection <ArrowUpRightIcon /></Link>
-              <Link to="/products?sort=newest" className="shop-text-link">See what's new <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+              <Link to="/products?sort=newest" className="shop-text-link">See what&apos;s new <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
             </div>
             <div className="shop-hero-bottom mt-14 flex items-center gap-5">
               <span className="shop-index">01 <span className="text-white/30">/ 03</span></span>
@@ -131,7 +131,7 @@ export function HomePage() {
               {Array.from({ length: 4 }, (_, i) => <div key={i} className="animate-pulse overflow-hidden rounded-2xl bg-white"><div className="aspect-[4/5] bg-[#e9e4dd]" /><div className="space-y-3 p-4"><div className="h-4 w-3/4 rounded bg-[#eee9e2]" /><div className="h-4 w-1/2 rounded bg-[#eee9e2]" /></div></div>)}
             </div>
           ) : error ? (
-            <div role="status" className="rounded-3xl border border-[#e8e3da] bg-white p-10 text-center"><p>We couldn't load the collection right now.</p><Link to="/products" className="mt-4 inline-flex font-semibold underline">Try browsing the catalog</Link></div>
+            <div role="status" className="rounded-3xl border border-[#e8e3da] bg-white p-10 text-center"><p>We couldn&apos;t load the collection right now.</p><Link to="/products" className="mt-4 inline-flex font-semibold underline">Try browsing the catalog</Link></div>
           ) : products.length === 0 ? (
             <div className="rounded-3xl border border-[#e8e3da] bg-white p-10 text-center"><p>New products are on their way.</p><Link to="/products" className="mt-4 inline-flex font-semibold underline">Browse the catalog</Link></div>
           ) : (
