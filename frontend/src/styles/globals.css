@@ -458,3 +458,21 @@
 @keyframes shop-hover-float {0%,100%{transform:translateY(0) rotateY(-9deg) rotateX(4deg);}50%{transform:translateY(-15px) rotateY(-6deg) rotateX(5deg);}}
 @media (max-width: 768px) {.shop-hero-title{font-size:clamp(3.7rem,13vw,5.7rem)}.shop-stage{max-width:470px}.shop-visual-card{border-radius:45% 45% 18px 18px}.editorial-tile{min-height:350px}.shop-floating-label{bottom:10%;font-size:11px}.shop-stage-orb{width:54px;height:54px}.shop-benefits .container-page>div{justify-content:flex-start}.shop-benefits .container-page{grid-template-columns:1fr 1fr}.shop-benefits .container-page>div:last-child{grid-column:1/-1;justify-content:center}}
 @media (prefers-reduced-motion:reduce){.shop-visual-card,.shop-stage-orb{animation:none!important}.editorial-tile img,.shop-pill-button,.shop-products-section .product-card{transition:none!important}}
+
+
+/* SecureShop second-pass product presentation, visual-only. */
+.product-card-premium {transform:perspective(1100px) rotateX(0) rotateY(0) translateY(0);transition:transform .55s cubic-bezier(.2,.75,.2,1),box-shadow .55s cubic-bezier(.2,.75,.2,1);box-shadow:0 4px 16px #1a24210d;will-change:transform}
+.product-card-premium:hover {transform:perspective(1100px) rotateX(2deg) rotateY(-2deg) translateY(-9px);box-shadow:18px 30px 60px #1a24212a}
+.product-card-media {background:#e6e2da;transform-style:preserve-3d}
+.product-card-photo {width:100%;height:100%;object-fit:cover;transition:transform .75s cubic-bezier(.2,.75,.2,1),filter .5s;filter:saturate(.91)}
+.product-card-premium:hover .product-card-photo {transform:scale(1.09);filter:saturate(1.07)}
+.product-card-sheen {position:absolute;inset:0;pointer-events:none;z-index:1;background:linear-gradient(125deg,transparent 25%,#ffffff36 43%,transparent 57%);transform:translateX(-120%);transition:transform .9s ease}
+.product-card-premium:hover .product-card-sheen {transform:translateX(120%)}
+.product-card-discount {background:#172d27;color:#f8e3d2;box-shadow:0 6px 18px #18282127}
+.product-card-explore {transition:transform .4s cubic-bezier(.2,.8,.2,1);color:#24352d}
+.product-card-premium:hover .product-card-explore {transform:rotate(45deg)}
+.product-card-placeholder {position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:24px;overflow:hidden;background:radial-gradient(circle at 32% 25%,#f7f0e6,#d5dbd2 54%,#b9c9bc);isolation:isolate}
+.product-card-placeholder-orbit {position:absolute;width:120%;aspect-ratio:1;border:1px solid #fff9;border-radius:50%;transform:rotateX(62deg) rotate(-22deg);box-shadow:0 0 0 31px #ffffff12,0 0 0 75px #ffffff0c}
+.product-card-placeholder-object {position:relative;margin:auto;width:46%;aspect-ratio:1;border-radius:33% 65% 45% 55%;background:radial-gradient(circle at 24% 18%,#fff8e8 0%,#dec3a6 35%,#ae8f70 70%,#756852 100%);box-shadow:inset -15px -20px 30px #725b4044,15px 30px 45px #584f433d;transform:rotate(-24deg);animation:shop-product-orbit 7s ease-in-out infinite}
+@keyframes shop-product-orbit {0%,100%{transform:translateY(0) rotate(-24deg)}50%{transform:translateY(-14px) rotate(-14deg)}}
+@media(prefers-reduced-motion:reduce){.product-card-placeholder-object{animation:none}.product-card-premium,.product-card-photo,.product-card-sheen{transition:none}.product-card-premium:hover{transform:none}}
