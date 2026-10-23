@@ -403,3 +403,58 @@
   .animation-delay-400 { animation-delay: 400ms; }
   .animation-delay-500 { animation-delay: 500ms; }
 }
+
+
+/* Immersive storefront: presentation only. All commerce behavior is unchanged. */
+.immersive-shop { background:#f8f6f1; color:#25241f; }
+.shop-hero { background:radial-gradient(ellipse at 68% 30%,#343a38 0%,#202826 41%,#101b1a 100%); color:#fff; }
+.shop-hero-glow {position:absolute;inset:0;background:radial-gradient(circle at 72% 44%,rgba(218,169,119,.17),transparent 37%);pointer-events:none;}
+.shop-hero-title {font-family:var(--font-display);font-weight:400;font-size:clamp(4.1rem,7.8vw,8.7rem);line-height:.98;letter-spacing:-.067em;color:#fff;}
+.shop-hero-title em,.shop-section-title em,.shop-final-cta em {font-weight:400;color:#d9ad89;}
+.shop-hero-copy {color:#c9ceca;font-size:clamp(1rem,1.4vw,1.18rem);line-height:1.85;}
+.shop-eyebrow,.shop-section-kicker {display:flex;align-items:center;gap:13px;font-size:11px;letter-spacing:.26em;font-weight:700;}
+.shop-eyebrow {color:#dcc0a7;}
+.shop-eyebrow-line {width:30px;height:1px;background:currentColor;}
+.shop-pill-button {display:inline-flex;align-items:center;justify-content:center;gap:26px;min-height:58px;border-radius:100px;padding:0 27px;background:#e5b994;color:#1d2926;font-weight:700;font-size:14px;transition:transform .3s,background .3s,box-shadow .3s;}
+.shop-pill-button:hover {background:#f5d4b8;color:#1d2926;transform:translateY(-3px);box-shadow:0 15px 36px rgba(0,0,0,.19);}
+.shop-text-link {display:inline-flex;align-items:center;gap:10px;color:#fff;border-bottom:1px solid #ffffff70;padding:14px 2px;font-size:14px;font-weight:600;}
+.shop-text-link:hover {color:#e5b994;}
+.shop-index {font-size:12px;letter-spacing:.13em;color:white;}
+.shop-index-line {height:1px;width:45px;background:#d9ad89;}
+.shop-stage {aspect-ratio:1/.98;perspective:1000px;transform-style:preserve-3d;}
+.shop-visual-card {position:absolute;inset:7% 7% 4% 11%;border-radius:46% 46% 23px 23px;overflow:hidden;box-shadow:0 45px 110px #0007;transform:rotateY(-9deg) rotateX(4deg);animation:shop-hover-float 8s ease-in-out infinite;}
+.shop-hero-photo {width:100%;height:100%;object-fit:cover;object-position:center;}
+.shop-visual-shade {position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.65),transparent 45%);}
+.shop-visual-caption {position:absolute;bottom:28px;left:29px;right:29px;display:flex;justify-content:space-between;gap:12px;font-size:9px;letter-spacing:.19em;font-weight:700;color:white;}
+.shop-stage-ring {position:absolute;width:88%;aspect-ratio:1;border:1px solid #e5b99440;border-radius:50%;top:1%;left:8%;transform:rotateX(65deg) rotateZ(-20deg);}
+.shop-stage-ring--two {width:104%;top:9%;left:-3%;transform:rotateY(65deg) rotateZ(35deg);}
+.shop-stage-orb {position:absolute;right:0;top:9%;width:75px;height:75px;border-radius:50%;background:radial-gradient(circle at 33% 30%,#fff0d1,#be8661 54%,#4e3a2c);box-shadow:0 15px 60px #0007;animation:shop-hover-float 6s ease-in-out infinite reverse;}
+.shop-floating-label {position:absolute;z-index:2;left:0;bottom:16%;display:flex;align-items:center;gap:10px;border:1px solid #ffffff33;border-radius:50px;background:#faf8f0ed;color:#24302d;font-size:12px;font-weight:700;padding:16px 18px;box-shadow:0 14px 50px #0004;transform:translateZ(55px);}
+.shop-bottom-fade {position:absolute;inset:auto 0 0;height:80px;background:linear-gradient(transparent,#111d1b);}
+.shop-benefits {background:#f1ede6;}
+.shop-benefits .container-page>div {display:flex;align-items:center;justify-content:center;gap:13px;font-size:12px;font-weight:650;letter-spacing:.06em;color:#5c5b53;}
+.shop-benefits svg {color:#a17b5e;}
+.shop-section-kicker {color:#a47b58;}
+.shop-section-title {font-size:clamp(2.6rem,5vw,5rem);font-weight:400;line-height:1.08;letter-spacing:-.055em;}
+.shop-section-title em {color:#a57b5e;}
+.shop-dark-link {display:inline-flex;align-items:center;gap:15px;border-bottom:1px solid #292a24;padding-bottom:9px;font-size:14px;font-weight:700;}
+.shop-dark-link:hover {color:#a57b5e;}
+.shop-collections {background:#faf9f5;}
+.editorial-tile {position:relative;display:block;min-height:410px;overflow:hidden;border-radius:20px;isolation:isolate;background:#3b4440;}
+.editorial-tile img {width:100%;height:100%;position:absolute;inset:0;object-fit:cover;transition:transform .85s cubic-bezier(.2,.7,.2,1);}
+.editorial-tile:hover img {transform:scale(1.09);}
+.editorial-tile-shade {position:absolute;inset:0;background:linear-gradient(0deg,#101915c9,transparent 68%);}
+.editorial-tile-content {position:absolute;inset:auto 30px 30px;color:white;}
+.editorial-overline {font-size:10px;letter-spacing:.24em;font-weight:700;color:#e7d6c1;}
+.editorial-tile h3 {margin-top:20px;color:white;font-size:clamp(2rem,3vw,3.3rem);line-height:1.1;font-weight:400;}
+.editorial-tile p {margin-top:9px;color:#eee9e0;font-size:14px;}
+.editorial-arrow {display:grid;place-items:center;flex-shrink:0;width:52px;height:52px;background:#ffffffeb;border-radius:50%;color:#182521;transition:transform .35s;}
+.editorial-tile:hover .editorial-arrow {transform:rotate(-45deg);}
+.shop-products-section {background:#f3f0ea;}
+.shop-products-section .product-card {border:1px solid #eae5dc;border-radius:17px;box-shadow:none;background:#fff;transition:transform .4s,box-shadow .4s;}
+.shop-products-section .product-card:hover {transform:translateY(-8px);box-shadow:0 22px 52px #514c401c;}
+.shop-products-section .product-card-image {background:#eae5de;}
+.shop-final-cta {position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 110%,#3b4b43,#172623 67%);}
+@keyframes shop-hover-float {0%,100%{transform:translateY(0) rotateY(-9deg) rotateX(4deg);}50%{transform:translateY(-15px) rotateY(-6deg) rotateX(5deg);}}
+@media (max-width: 768px) {.shop-hero-title{font-size:clamp(3.7rem,13vw,5.7rem)}.shop-stage{max-width:470px}.shop-visual-card{border-radius:45% 45% 18px 18px}.editorial-tile{min-height:350px}.shop-floating-label{bottom:10%;font-size:11px}.shop-stage-orb{width:54px;height:54px}.shop-benefits .container-page>div{justify-content:flex-start}.shop-benefits .container-page{grid-template-columns:1fr 1fr}.shop-benefits .container-page>div:last-child{grid-column:1/-1;justify-content:center}}
+@media (prefers-reduced-motion:reduce){.shop-visual-card,.shop-stage-orb{animation:none!important}.editorial-tile img,.shop-pill-button,.shop-products-section .product-card{transition:none!important}}
