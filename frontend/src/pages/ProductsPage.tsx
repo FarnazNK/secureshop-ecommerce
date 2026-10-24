@@ -163,7 +163,7 @@ export function ProductsPage() {
       <div className="bg-ink-900 text-white py-12 md:py-20">
         <div className="container-page">
           <p className="text-accent-300 text-sm font-semibold tracking-[0.2em] uppercase mb-4">SecureShop / Catalog</p>
-          <h1 className="text-display-lg font-display mb-4">Explore the collection.</h1>
+          <h1 className="text-display-lg font-display mb-4 text-white">Explore the collection.</h1>
           <p className="text-ink-300 text-lg max-w-2xl">
             Discover our curated collection of premium products, crafted with care and designed to elevate your everyday.
           </p>

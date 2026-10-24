@@ -21,6 +21,20 @@ const config: Config = {
           900: '#75301e',
           950: '#3f160c',
         },
+        // `accent-*` classes are used across pages; alias them to the brand terracotta.
+        accent: {
+          50: '#fef7f4',
+          100: '#fdeee7',
+          200: '#fbd9ca',
+          300: '#f7b99e',
+          400: '#f1906a',
+          500: '#e86f42',
+          600: '#d45428',
+          700: '#b04221',
+          800: '#8f3720',
+          900: '#75301e',
+          950: '#3f160c',
+        },
         // Warm neutrals for backgrounds
         sand: {
           50: '#fdfcfb',

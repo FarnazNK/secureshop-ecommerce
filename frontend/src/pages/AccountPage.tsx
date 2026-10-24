@@ -103,7 +103,7 @@ export function AccountPage() {
               {profile.firstName[0]}{profile.lastName[0]}
             </div>
             <div>
-              <h1 className="text-display-md font-display">
+              <h1 className="text-display-md font-display text-white">
                 {profile.firstName} {profile.lastName}
               </h1>
               <p className="text-ink-300">{profile.email}</p>

@@ -267,7 +267,7 @@ export function OrdersPage() {
     <div className="min-h-screen bg-sand-50">
       <div className="bg-ink-900 text-white py-16">
         <div className="container-page">
-          <h1 className="text-display-lg font-display">Your Orders</h1>
+          <h1 className="text-display-lg font-display text-white">Your Orders</h1>
           <p className="text-ink-300 mt-2">Portfolio demo order history</p>
         </div>
       </div>

@@ -1,293 +1,139 @@
-# SecureShop — Secure E-Commerce Platform (FastAPI Edition)
+# SecureShop
 
-> **SecureShop at a glance:** A customer-facing React/TypeScript e-commerce storefront with API-backed product browsing, catalog search/filter/sort, product details, cart and account flows, supported by a security-focused FastAPI/PostgreSQL backend.
->
-> **Try it:** [Live storefront](https://secureshop-storefront.vercel.app) · [Catalog](https://secureshop-storefront.vercel.app/products) · [API reference](https://secureshop-api.vercel.app/api/reference) · [Frontend source](frontend/src/) · [Backend source](backend/)
->
-> **Frontend engineering:** Responsive catalog and product cards, URL-driven filters and sorting, asynchronous loading/error/empty states, accessible navigation and shopping actions, React Router and Tailwind CSS.
->
-> **Backend engineering:** JWT access/refresh authentication, role-aware authorization, refresh-token rotation, request validation, rate limiting, SQLAlchemy/PostgreSQL order models and price snapshots.
->
-> **Demo boundaries:** Catalog data is synthetic. Checkout/payment processing and email delivery are not live. The storefront is a shopping experience; implementation details belong in this README.
->
-> **Where to look:** `frontend/src/pages/HomePage.tsx` (API-backed homepage), `frontend/src/pages/ProductsPage.tsx` (catalog), `frontend/src/components/product/ProductCard.tsx` (shopping interactions), `backend/app/` (services and security).
+**A security-first full-stack e-commerce app.** React + TypeScript storefront and a FastAPI/PostgreSQL backend built around the OWASP Top 10: refresh-token rotation with theft detection, constant-time login, RBAC, rate limiting and safe money handling.
 
+[![CI](https://github.com/FarnazNK/secureshop-ecommerce/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/FarnazNK/secureshop-ecommerce/actions/workflows/ci.yml)
+[![Security](https://github.com/FarnazNK/secureshop-ecommerce/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/FarnazNK/secureshop-ecommerce/actions/workflows/security.yml)
 
-## Prometheus & Grafana — free local monitoring
+**[🛍️ Live storefront](https://secureshop-storefront.vercel.app)** · **[📦 Catalog](https://secureshop-storefront.vercel.app/products)** · **[📘 API reference](https://secureshop-api.vercel.app/api/reference)** · **[💚 API health](https://secureshop-api.vercel.app/api/v1/health)**
 
-The optional [Prometheus and Grafana Kubernetes add-on](k8s/MONITORING.md) collects application HTTP metrics and provides dashboards on a **localhost-only kind cluster**, with no AWS costs. Prometheus and Grafana run as private ClusterIP Services, and Grafana's admin password is created as a Kubernetes Secret. CI validates the manifests; this is a locally runnable portfolio setup, **not** a live production monitoring deployment.
+![SecureShop catalog page with filters and product cards](docs/screenshots/catalog.png)
 
+---
 
-## Kubernetes container orchestration (free local demo)
+## At a glance
 
-The Docker images for SecureShop can also be managed with **Kubernetes on your laptop using kind**. This is optional: Docker Compose and the existing APIs continue to work as before. The `k8s/local.yaml` example defines Kubernetes Deployments and internal ClusterIP Services, a local PostgreSQL persistent volume, resource limits, and external runtime-generated Secret references. No AWS account, managed Kubernetes service, or paid cloud resource is needed.
+| | |
+| --- | --- |
+| **What it is** | An online store: product catalog with search, filters and sorting, product pages, cart, accounts and orders |
+| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, React Router, React Query |
+| **Backend** | Python, FastAPI (async), SQLAlchemy 2.0, PostgreSQL, Alembic, Pydantic v2 |
+| **Security** | JWT access + refresh tokens, token rotation with reuse detection, bcrypt, RBAC, rate limiting, CSP/HSTS headers |
+| **Quality** | 26 backend tests (pytest) run against real PostgreSQL and Redis in CI, Ruff lint/format, CodeQL, dependency audits |
+| **Deployed on** | Vercel (storefront + API) with Neon PostgreSQL |
 
-Follow the setup and cleanup instructions in **[k8s/README.md](k8s/README.md)**. Kubernetes manifests are checked by a dedicated GitHub Actions validation workflow. This is a **local demonstration**, not a tested production or public cluster deployment.
+## What I built
 
+### 🔐 Authentication that handles stolen tokens
+Access and refresh tokens are signed with **separate secrets**, and refresh tokens live in **HTTP-only, SameSite cookies**. Every refresh **rotates** the token, and if an already-used token is ever presented again, a sign it was stolen, **every session for that user is revoked**. Login runs bcrypt even when the email doesn't exist, so response timing can't reveal which emails are registered. Repeated failures trigger an account lockout.
+→ [`backend/app/services/auth_service.py`](backend/app/services/auth_service.py)
 
-## AWS AgentCore — free portfolio demo
+### 🛡️ Hardened API
+Security-headers middleware (CSP, HSTS in production, X-Frame-Options, Referrer-Policy, Permissions-Policy), explicit CORS origins, per-IP rate limits that are stricter on auth endpoints, Pydantic validation on every input, and an error handler that never leaks stack traces. Role-based access uses a declarative `require_role("admin")` dependency. The app **refuses to start** if a required secret is missing or shorter than 32 characters.
+→ [`backend/app/middleware/`](backend/app/middleware/), [`backend/app/core/config.py`](backend/app/core/config.py)
 
-This project includes an **optional, disabled-by-default** authenticated product-catalog assistant using a server-side AgentCore adapter. Its read-only context is restricted to active public product names and short descriptions; **orders, payment data and account records are not exposed** to the agent. The hosted storefront and API do not run AWS AgentCore by default.
+### 💳 Orders and payments done safely
+Money is stored as exact decimals (`Numeric(10, 2)`), never floats. Each order item **snapshots** the product name and price at purchase time, so receipts stay correct if the catalog changes. Card data never touches the database: payments go through **Stripe payment intents** created server-side.
+→ [`backend/app/api/v1/orders.py`](backend/app/api/v1/orders.py), [`backend/app/models/`](backend/app/models/)
 
-Run the mock-only local demonstration (no AWS credentials or billing):
+### 🛍️ Storefront
+API-backed catalog with search, category and price filters and sorting kept in the URL (so filtered views are shareable), loading, empty and error states, product pages with stock info, and cart and account flows. Responsive and keyboard accessible.
+→ [`frontend/src/pages/`](frontend/src/pages/)
 
-```bash
-python aws_agentcore/demo_offline.py
+### 🚀 CI/CD
+GitHub Actions runs Ruff lint and format checks, applies Alembic migrations to a real **PostgreSQL 16** database, runs pytest with coverage alongside Redis, type-checks and builds the frontend, builds Docker images, and runs **CodeQL** plus dependency audits.
+→ [`.github/workflows/`](.github/workflows/)
+
+## Screenshots
+
+![Product detail page with price, discount, stock and add-to-cart](docs/screenshots/product.png)
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph FE["Storefront · Vercel"]
+        UI["React + TypeScript<br/>Tailwind · React Query"]
+    end
+
+    subgraph BE["FastAPI · Vercel"]
+        MW["Security headers · CORS<br/>rate limits · request IDs"]
+        Routes["Routes: auth, products,<br/>cart, orders"]
+        Services["Service layer<br/>(auth, token rotation)"]
+    end
+
+    DB[("PostgreSQL<br/>users · products · carts<br/>orders · refresh tokens")]
+    Stripe["Stripe<br/>(payment intents)"]
+
+    UI -->|"/api/* HTTPS"| MW --> Routes --> Services --> DB
+    Routes -.->|optional| Stripe
 ```
 
-Tests: `python -m pytest aws_agentcore/test_agentcore_readonly.py -q` (with backend test dependencies). See [`aws_agentcore/PORTFOLIO.md`](aws_agentcore/PORTFOLIO.md) for architecture, safety constraints and known limitations. Actual AWS deployment and live security verification have not been performed.
+Route handlers stay thin; business logic lives in `app/services/`, so it can be tested without an HTTP server. Pydantic schemas (the API contract) are kept separate from SQLAlchemy models (the database), so either can change without breaking the other.
 
+## Run it locally
 
-[![ci](https://github.com/FarnazNK/secureshop-ecommerce/actions/workflows/ci.yml/badge.svg)](https://github.com/FarnazNK/secureshop-ecommerce/actions)
-[![python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi)](https://fastapi.tiangolo.com)
-[![Security](https://img.shields.io/badge/Security-OWASP%20Top%2010-green)](https://owasp.org/)
-[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#run-with-docker)
-
-**Live:** [Storefront](https://secureshop-storefront.vercel.app) · [Live API](https://secureshop-api.vercel.app/api/reference) · [Products API](https://secureshop-api.vercel.app/api/v1/products) · [API Health](https://secureshop-api.vercel.app/api/v1/health)
-
-A production-style e-commerce platform with a Python/FastAPI backend, a
-React/TypeScript frontend, and a security model aligned with the OWASP
-Top 10. Built as a portfolio piece demonstrating end-to-end secure
-full-stack patterns with a strong AI/Python backend stack.
-
-> **Note:** This is a portfolio project. Schema, products, and demo data
-> are synthetic.
->
-> **Live demo:** <https://secureshop-storefront.vercel.app>  
-> **Products API:** <https://secureshop-api.vercel.app/api/v1/products>
-
-## Live deployment — start here
-
-- **Open the storefront:** <https://secureshop-storefront.vercel.app>
-- **Browse the demo catalog:** <https://secureshop-storefront.vercel.app/products>
-- **Inspect product data:** <https://secureshop-api.vercel.app/api/v1/products>
-- **Check API health:** <https://secureshop-api.vercel.app/api/v1/health>
-
-The storefront should display a synthetic product catalog without signing in. Login,
-cart, and order features need an account; live payment processing is disabled.
-A page loading by itself does not verify catalog data or checkout.
-
-The public deployment uses Vercel Hobby for the React frontend and FastAPI
-service, with managed Neon PostgreSQL. The frontend proxies `/api/*` to the API
-on the same origin; the current rate limiter is process-local. Stripe
-live payments and email delivery are not enabled for the portfolio demo.
-
----
-
-## Stack
-
-**Backend (Python)**
-- FastAPI 0.115+ with async route handlers
-- SQLAlchemy 2.0 async ORM over PostgreSQL (asyncpg driver)
-- Alembic for schema migrations
-- Redis support is included in the local deployment scaffolding; the hosted limiter remains process-local
-- Pydantic v2 for request/response validation
-- PyJWT + bcrypt for JWT and password hashing
-- slowapi for rate limiting
-- structlog for JSON-structured logging in production
-
-**Frontend (TypeScript)**
-- React 18 + Vite + TypeScript
-- Tailwind CSS, React Router, React Query
-- nginx in production (reverse-proxies `/api/*` to the backend)
-
-**Infrastructure**
-- PostgreSQL 16 plus Redis 7-compatible deployment scaffolding
-- Multi-stage Dockerfiles for both services (non-root, healthchecks)
-- docker-compose stack with persistent volumes
-- GitHub Actions CI: lint, format check, tests against live Postgres/Redis,
-  Docker build matrix
-
----
-
-## Security features
-
-Built around the OWASP Top 10 and standard defense-in-depth patterns:
-
-**Authentication & authorization**
-- JWT access + refresh tokens with **distinct signing secrets** per type
-- Refresh tokens stored in **HTTP-only, SameSite cookies**
-- **Refresh-token rotation with reuse detection** — presenting a revoked
-  token invalidates every active session for that user
-- bcrypt password hashing (cost 12, configurable)
-- **Constant-time login response** — bcrypt is run even on missing users
-  to prevent timing-based email enumeration
-- Account lockout after configurable failed-attempt threshold
-- Strict password policy (min length + char-class requirements)
-- Role-based access control with declarative `require_role(...)` dependency
-
-**API hardening**
-- Custom security-headers middleware: CSP, HSTS in prod, X-Frame-Options,
-  X-Content-Type-Options, Referrer-Policy, Permissions-Policy
-- CORS with explicit allowed origins (no `*` with credentials)
-- Per-IP rate limiting with tighter auth-endpoint limits
-- TrustedHostMiddleware in production
-- Pydantic v2 validation on every request body, query, and path param
-- Centralized exception handler that never leaks stack traces to clients
-- Per-request structured logging with request-ID propagation
-
-**Data layer**
-- Parameterized queries everywhere via SQLAlchemy
-- Money modeled as `Numeric(10, 2)` — never `Float`
-- Order items are price/name **snapshots** at order time so receipts stay
-  accurate even if the catalog changes
-- No card data ever touches the database — Stripe Elements handles PCI scope
-
----
-
-## Quickstart
-
-### Run with Docker
-
+**With Docker** (Postgres, Redis, API and storefront)
 ```bash
-# 1. Copy env template and fill in real secrets
-cp .env.example .env
-# Generate each secret with: openssl rand -base64 48
-
-# 2. Build and start the stack (postgres + redis + backend + frontend)
+cp .env.example .env            # fill in secrets: openssl rand -base64 48
 docker compose up --build
-
-# 3. In another terminal, apply DB migrations once
-docker compose run --rm migrate
-
-# Access:
-#   http://localhost:8080         — frontend (React SPA)
-#   http://localhost:3001/api/docs — Swagger UI (dev only)
-#   http://localhost:3001/api/v1/health — health check
+docker compose run --rm migrate # apply database migrations once
+# Storefront: http://localhost:8080 · API docs: http://localhost:3001/api/docs
 ```
 
-Tear everything down (including DB volume):
-
-```bash
-docker compose down -v
-```
-
-### Run backend locally (without Docker)
-
+**Without Docker**
 ```bash
 cd backend
-make dev          # install with dev extras
-cp .env.example .env
-# fill in DATABASE_URL, REDIS_URL, secrets
+make dev && cp .env.example .env   # set DATABASE_URL and secrets
+make migrate && make serve         # API on :3001
+make test                          # pytest
 
-make migrate      # apply schema
-make serve        # uvicorn --reload on :3001
-make test         # unit tests + async cart database test
-make lint         # ruff check + format check
+cd ../frontend
+npm install && npm run dev         # storefront on :5173
 ```
 
----
+## API
 
-## API surface
+| Area | Endpoints |
+| --- | --- |
+| Auth | `POST /api/v1/auth/register` · `login` · `refresh` · `logout` · `GET /api/v1/auth/me` |
+| Products | `GET /api/v1/products` (filters, pagination) · `GET /{id}` · admin-only `POST` / `PATCH` / `DELETE` |
+| Cart | `GET /api/v1/cart` · `POST /items` · `PATCH /items/{id}` · `DELETE /items/{id}` · `DELETE` |
+| Orders | `POST /api/v1/orders` (creates a Stripe payment intent) · `GET /api/v1/orders` · `GET /{id}` |
+| Health | `GET /api/v1/health` (API and database) |
 
-OpenAPI / Swagger UI is auto-generated at `/api/docs` (dev only — disabled
-in production builds).
+Full interactive reference: **[secureshop-api.vercel.app/api/reference](https://secureshop-api.vercel.app/api/reference)**
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| GET    | `/api/v1/health`              | —     | Liveness + DB reachability |
-| POST   | `/api/v1/auth/register`       | —     | Create account, set refresh cookie, return access token |
-| POST   | `/api/v1/auth/login`          | —     | Exchange credentials for tokens |
-| POST   | `/api/v1/auth/refresh`        | cookie | Rotate refresh token, mint new access token |
-| POST   | `/api/v1/auth/logout`         | cookie | Revoke current refresh token |
-| GET    | `/api/v1/auth/me`             | bearer | Current authenticated user |
-| GET    | `/api/v1/products`            | —     | List products (filters, pagination) |
-| GET    | `/api/v1/products/{id}`       | —     | Product detail |
-| POST   | `/api/v1/products`            | admin | Create product |
-| PATCH  | `/api/v1/products/{id}`       | admin | Update product |
-| DELETE | `/api/v1/products/{id}`       | admin | Delete product |
-| GET    | `/api/v1/cart`                | bearer | Current user's cart |
-| POST   | `/api/v1/cart/items`          | bearer | Add to cart |
-| PATCH  | `/api/v1/cart/items/{id}`     | bearer | Update item quantity |
-| DELETE | `/api/v1/cart/items/{id}`     | bearer | Remove item |
-| DELETE | `/api/v1/cart`                | bearer | Clear cart |
-| POST   | `/api/v1/orders`              | bearer | Create order from cart, returns Stripe client secret |
-| GET    | `/api/v1/orders`              | bearer | List user's orders |
-| GET    | `/api/v1/orders/{id}`         | bearer | Order detail |
+## Honest limitations
 
----
+This is a portfolio project. Products and data are synthetic, and nothing is really sold.
 
-## Project structure
+- **Payments:** live Stripe payments and the payment webhook are not enabled, so orders stay in `PENDING`.
+- **Email:** account and order emails aren't sent.
+- **Rate limiting:** the hosted limiter is per process. A shared Redis-backed limiter is set up for local Docker but not used in the hosted demo.
+- **Frontend tests:** the storefront has no automated UI tests yet. Backend security logic is where the tests focus.
 
-```
-secureshop-fastapi/
-├── backend/
-│   ├── app/
-│   │   ├── api/
-│   │   │   ├── deps.py              # FastAPI dependencies (current_user, require_role)
-│   │   │   └── v1/                  # Route handlers (thin)
-│   │   │       ├── auth.py
-│   │   │       ├── cart.py
-│   │   │       ├── health.py
-│   │   │       ├── orders.py
-│   │   │       └── products.py
-│   │   ├── core/
-│   │   │   ├── config.py            # pydantic-settings, required-secret validation
-│   │   │   ├── logging.py           # structlog setup (JSON in prod)
-│   │   │   └── security.py          # bcrypt + JWT primitives
-│   │   ├── db/
-│   │   │   ├── base.py              # declarative Base, mixins
-│   │   │   └── session.py           # async session, get_db dependency
-│   │   ├── middleware/
-│   │   │   ├── request_logging.py   # request-ID + structured access log
-│   │   │   └── security_headers.py  # CSP, HSTS, X-Frame-Options, etc.
-│   │   ├── models/                  # SQLAlchemy models (User, Product, Cart, Order, ...)
-│   │   ├── schemas/                 # Pydantic request/response models
-│   │   ├── services/
-│   │   │   └── auth_service.py      # business logic — login, register, refresh rotation
-│   │   └── main.py                  # FastAPI app factory
-│   ├── alembic/                     # migrations
-│   │   ├── env.py
-│   │   └── versions/
-│   │       ├── 0001_initial.py
-│   │       └── 0002_demo_catalog.py
-│   ├── tests/                       # security, schemas, config, async cart database test
-│   ├── Dockerfile                   # multi-stage, non-root, tini, healthcheck
-│   ├── Makefile                     # one-line entry points
-│   ├── alembic.ini
-│   └── pyproject.toml
-├── frontend/                        # React 18 + Vite + TypeScript SPA
-│   ├── src/
-│   ├── Dockerfile                   # multi-stage Vite build → nginx
-│   └── nginx.conf                   # SPA fallback + /api reverse-proxy
-├── docker-compose.yml               # postgres + redis + backend + frontend + migrate
-├── .github/workflows/ci.yml         # lint, tests against live PG/Redis, docker build
-├── .env.example
-└── README.md
-```
+<details>
+<summary><strong>Optional extras: AWS AgentCore catalog assistant, Kubernetes, Prometheus/Grafana</strong></summary>
+
+None of these need a paid account.
+
+- **AgentCore catalog assistant:** a disabled-by-default, authenticated assistant that only sees active public product names and short descriptions, never orders, payments or accounts. Run `python aws_agentcore/demo_offline.py`. Security tests run in CI. Details in [`aws_agentcore/PORTFOLIO.md`](aws_agentcore/PORTFOLIO.md). Not deployed to AWS.
+- **Kubernetes:** manifests for a local kind cluster (Deployments, ClusterIP Services, a Postgres volume, resource limits), validated in CI. See [`k8s/README.md`](k8s/README.md).
+- **Prometheus + Grafana:** local-only HTTP metrics dashboards. See [`k8s/MONITORING.md`](k8s/MONITORING.md).
+
+</details>
+
+## Repository guide
+
+| Path | What's there |
+| --- | --- |
+| [`backend/app/`](backend/app/) | FastAPI app: routes, services, models, schemas, middleware, security |
+| [`backend/tests/`](backend/tests/) | Security, schema, config and database tests |
+| [`frontend/src/`](frontend/src/) | React storefront: pages, components, auth and cart context |
+| [`.github/workflows/`](.github/workflows/) | CI, security scans, Kubernetes validation |
+| [`SECURITY.md`](SECURITY.md) | Security policy |
 
 ---
 
-## Design decisions worth pointing at
-
-**Schemas separate from models.** Pydantic schemas (`app/schemas/`) define
-the wire format; SQLAlchemy models (`app/models/`) define the database. The
-two evolve independently — a column rename doesn't have to break API clients.
-
-**Refresh-token reuse detection.** Every refresh token is persisted with a
-JTI. When a token is rotated, the old row's `revoked_at` is set. If a
-revoked token is ever presented again (a sign of theft), `_revoke_all_for_user`
-fires and invalidates every active session for that user.
-
-**Constant-time login.** `verify_password` is run against a fixed dummy
-hash even when the user lookup misses. Without this, response timing
-distinguishes "no such user" from "wrong password" and enables email
-enumeration.
-
-**Order item snapshots.** `OrderItem` copies `product_name`, `product_slug`,
-and `unit_price` at order time. If a product is later renamed, repriced, or
-deleted, historical receipts stay correct.
-
-**Service layer.** Business logic lives in `app/services/`, not in route
-handlers. The handlers translate HTTP into service calls; this keeps the
-logic testable without spinning up an HTTP server.
-
-**Required-secret validation at boot.** The `Settings` class declares JWT
-and encryption secrets with `min_length=32` and no defaults. The app crashes
-at startup if any are missing — better than booting and silently using
-weak crypto.
-
----
-
-## Testing
+Built by **Farnaz Nasehi** · [LinkedIn](https://www.linkedin.com/in/farnaz-nasehi/) · [GitHub](https://github.com/FarnazNK)
