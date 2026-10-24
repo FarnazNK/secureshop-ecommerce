@@ -113,17 +113,6 @@ This is a portfolio project. Products and data are synthetic, and nothing is rea
 - **Rate limiting:** the hosted limiter is per process. A shared Redis-backed limiter is set up for local Docker but not used in the hosted demo.
 - **Frontend tests:** the storefront has no automated UI tests yet. Backend security logic is where the tests focus.
 
-<details>
-<summary><strong>Optional extras: AWS AgentCore catalog assistant, Kubernetes, Prometheus/Grafana</strong></summary>
-
-None of these need a paid account.
-
-- **AgentCore catalog assistant:** a disabled-by-default, authenticated assistant that only sees active public product names and short descriptions, never orders, payments or accounts. Run `python aws_agentcore/demo_offline.py`. Security tests run in CI. Details in [`aws_agentcore/PORTFOLIO.md`](aws_agentcore/PORTFOLIO.md). Not deployed to AWS.
-- **Kubernetes:** manifests for a local kind cluster (Deployments, ClusterIP Services, a Postgres volume, resource limits), validated in CI. See [`k8s/README.md`](k8s/README.md).
-- **Prometheus + Grafana:** local-only HTTP metrics dashboards. See [`k8s/MONITORING.md`](k8s/MONITORING.md).
-
-</details>
-
 ## Repository guide
 
 | Path | What's there |
