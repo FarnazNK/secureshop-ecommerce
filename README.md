@@ -65,15 +65,16 @@ flowchart LR
 
     subgraph BE["FastAPI · Vercel"]
         MW["Security headers · CORS<br/>rate limits · request IDs"]
-        Routes["Routes: auth, products,<br/>cart, orders"]
+        Routes["Routes: auth, products,<br/>cart, orders, payments"]
         Services["Service layer<br/>(auth, token rotation)"]
     end
 
-    DB[("PostgreSQL<br/>users · products · carts<br/>orders · refresh tokens")]
+    DB[("PostgreSQL<br/>users · products · carts<br/>orders · refresh tokens<br/>idempotency keys · webhook events")]
     Stripe["Stripe<br/>(payment intents)"]
 
     UI -->|"/api/* HTTPS"| MW --> Routes --> Services --> DB
     Routes -.->|optional| Stripe
+    Stripe -.->|signed webhooks| Routes
 ```
 
 Route handlers stay thin; business logic lives in `app/services/`, so it can be tested without an HTTP server. Pydantic schemas (the API contract) are kept separate from SQLAlchemy models (the database), so either can change without breaking the other.
@@ -106,7 +107,8 @@ npm install && npm run dev         # storefront on :5173
 | Auth | `POST /api/v1/auth/register` · `login` · `refresh` · `logout` · `GET /api/v1/auth/me` |
 | Products | `GET /api/v1/products` (filters, pagination) · `GET /{id}` · admin-only `POST` / `PATCH` / `DELETE` |
 | Cart | `GET /api/v1/cart` · `POST /items` · `PATCH /items/{id}` · `DELETE /items/{id}` · `DELETE` |
-| Orders | `POST /api/v1/orders` (creates a Stripe payment intent) · `GET /api/v1/orders` · `GET /{id}` |
+| Orders | `POST /api/v1/orders` (accepts `Idempotency-Key`; creates a Stripe payment intent) · `GET /api/v1/orders` · `GET /{id}` |
+| Payments | `POST /api/v1/payments/stripe/webhook` (Stripe-signed events only) |
 | Health | `GET /api/v1/health` (API and database) |
 
 Full interactive reference: **[secureshop-api.vercel.app/api/reference](https://secureshop-api.vercel.app/api/reference)**
@@ -115,7 +117,7 @@ Full interactive reference: **[secureshop-api.vercel.app/api/reference](https://
 
 This is a portfolio project. Products and data are synthetic, and nothing is really sold.
 
-- **Payments:** live Stripe payments and the payment webhook are not enabled, so orders stay in `PENDING`.
+- **Payments:** the hosted demo has no Stripe account connected, so its orders stay in `PENDING`. The webhook that moves them to paid or cancelled is implemented and tested against PostgreSQL.
 - **Email:** account and order emails aren't sent.
 - **Rate limiting:** the hosted limiter is per process. A shared Redis-backed limiter is set up for local Docker but not used in the hosted demo.
 - **Frontend tests:** the storefront has no automated UI tests yet. Backend security logic is where the tests focus.
@@ -136,7 +138,7 @@ None of these need a paid account.
 | Path | What's there |
 | --- | --- |
 | [`backend/app/`](backend/app/) | FastAPI app: routes, services, models, schemas, middleware, security |
-| [`backend/tests/`](backend/tests/) | Security, schema, config and database tests |
+| [`backend/tests/`](backend/tests/) | Security, schema and config tests; checkout concurrency and webhook tests on PostgreSQL |
 | [`frontend/src/`](frontend/src/) | React storefront: pages, components, auth and cart context |
 | [`.github/workflows/`](.github/workflows/) | CI, security scans, Kubernetes validation |
 | [`SECURITY.md`](SECURITY.md) | Security policy |
