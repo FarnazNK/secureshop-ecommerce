@@ -67,16 +67,26 @@ def upgrade() -> None:
             ON CONFLICT DO NOTHING
             """
         ).bindparams(
-            p1=PRODUCT_IDS[0], p2=PRODUCT_IDS[1], p3=PRODUCT_IDS[2], p4=PRODUCT_IDS[3],
-            c1=CATEGORY_IDS[0], c2=CATEGORY_IDS[1], c3=CATEGORY_IDS[2], c4=CATEGORY_IDS[3],
+            p1=PRODUCT_IDS[0],
+            p2=PRODUCT_IDS[1],
+            p3=PRODUCT_IDS[2],
+            p4=PRODUCT_IDS[3],
+            c1=CATEGORY_IDS[0],
+            c2=CATEGORY_IDS[1],
+            c3=CATEGORY_IDS[2],
+            c4=CATEGORY_IDS[3],
         )
     )
 
 
 def downgrade() -> None:
     op.execute(
-        sa.text("DELETE FROM product WHERE id = ANY(CAST(:ids AS uuid[]))").bindparams(ids=PRODUCT_IDS)
+        sa.text("DELETE FROM product WHERE id = ANY(CAST(:ids AS uuid[]))").bindparams(
+            ids=PRODUCT_IDS
+        )
     )
     op.execute(
-        sa.text("DELETE FROM category WHERE id = ANY(CAST(:ids AS uuid[]))").bindparams(ids=CATEGORY_IDS)
+        sa.text("DELETE FROM category WHERE id = ANY(CAST(:ids AS uuid[]))").bindparams(
+            ids=CATEGORY_IDS
+        )
     )
