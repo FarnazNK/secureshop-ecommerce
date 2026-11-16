@@ -3,6 +3,7 @@
 Do not expose runtime ARN to browsers, accept an ARN from clients, or send
 credentials, payments, or unverified tenant data to model providers.
 """
+
 from __future__ import annotations
 
 import json
@@ -37,6 +38,18 @@ def invoke_readonly_agent(
         import boto3
 
         client = boto3.client("bedrock-agentcore")
+    # Every way the call can fail, mapped to one generic error: AWS SDK errors, network and
+    # stream errors, and malformed or oversized responses (including our own checks below).
+    # Anything else is a bug and should surface rather than look like an agent outage.
+    sanitized: tuple[type[Exception], ...] = (
+        AgentCoreUnavailable,
+        ValueError,  # invalid JSON or text encoding
+        KeyError,
+        TypeError,
+        AttributeError,
+        OSError,
+        *_aws_sdk_errors(),
+    )
     try:
         response = client.invoke_agent_runtime(
             agentRuntimeArn=runtime_arn,
@@ -55,5 +68,15 @@ def invoke_readonly_agent(
         if not isinstance(result, dict) or not isinstance(result.get("answer"), str):
             raise AgentCoreUnavailable("Invalid agent response")
         return result["answer"][:12000]
-    except Exception:
+    except sanitized:
         raise AgentCoreUnavailable("Agent invocation failed") from None
+
+
+def _aws_sdk_errors() -> tuple[type[Exception], ...]:
+    """botocore's error base classes, or none when boto3 isn't installed (tests inject a
+    client, so the SDK is optional)."""
+    try:
+        from botocore.exceptions import BotoCoreError, ClientError
+    except ImportError:
+        return ()
+    return (BotoCoreError, ClientError)

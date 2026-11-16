@@ -42,8 +42,12 @@ def upgrade() -> None:
         sa.Column("failed_login_attempts", sa.Integer, nullable=False, server_default="0"),
         sa.Column("lockout_until", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_login_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
     )
     op.create_index("ix_user_email", "user", ["email"], unique=True)
 
@@ -51,14 +55,22 @@ def upgrade() -> None:
     op.create_table(
         "refresh_token",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("user.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("jti", sa.String(64), nullable=False, unique=True),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("is_compromised", sa.Boolean, nullable=False, server_default=sa.text("false")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
     )
     op.create_index("ix_refresh_token_user_id", "refresh_token", ["user_id"])
     op.create_index("ix_refresh_token_jti", "refresh_token", ["jti"], unique=True)
@@ -70,8 +82,12 @@ def upgrade() -> None:
         sa.Column("name", sa.String(100), nullable=False, unique=True),
         sa.Column("slug", sa.String(120), nullable=False, unique=True),
         sa.Column("description", sa.Text, nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
     )
     op.create_index("ix_category_slug", "category", ["slug"], unique=True)
 
@@ -88,10 +104,18 @@ def upgrade() -> None:
         sa.Column("stock_quantity", sa.Integer, nullable=False, server_default="0"),
         sa.Column("is_active", sa.Boolean, nullable=False, server_default=sa.text("true")),
         sa.Column("is_featured", sa.Boolean, nullable=False, server_default=sa.text("false")),
-        sa.Column("category_id", postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey("category.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "category_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("category.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
     )
     op.create_index("ix_product_slug", "product", ["slug"], unique=True)
     op.create_index("ix_product_is_active", "product", ["is_active"])
@@ -102,13 +126,21 @@ def upgrade() -> None:
     op.create_table(
         "product_image",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("product_id", postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey("product.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "product_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("product.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("url", sa.String(500), nullable=False),
         sa.Column("alt", sa.String(255), nullable=True),
         sa.Column("position", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
     )
     op.create_index("ix_product_image_product_id", "product_image", ["product_id"])
 
@@ -116,24 +148,45 @@ def upgrade() -> None:
     op.create_table(
         "cart",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey("user.id", ondelete="CASCADE"), nullable=False, unique=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "user_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("user.id", ondelete="CASCADE"),
+            nullable=False,
+            unique=True,
+        ),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
     )
 
     # --- cart_item ---
     op.create_table(
         "cart_item",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("cart_id", postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey("cart.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("product_id", postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey("product.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "cart_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("cart.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "product_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("product.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("quantity", sa.Integer, nullable=False),
         sa.Column("unit_price", sa.Numeric(10, 2), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
         sa.UniqueConstraint("cart_id", "product_id", name="uq_cart_product"),
     )
     op.create_index("ix_cart_item_cart_id", "cart_item", ["cart_id"])
@@ -143,8 +196,12 @@ def upgrade() -> None:
     op.create_table(
         "order",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey("user.id", ondelete="RESTRICT"), nullable=False),
+        sa.Column(
+            "user_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("user.id", ondelete="RESTRICT"),
+            nullable=False,
+        ),
         sa.Column("order_number", sa.String(40), nullable=False, unique=True),
         sa.Column("status", sa.String(20), nullable=False, server_default="pending"),
         sa.Column("subtotal", sa.Numeric(10, 2), nullable=False),
@@ -153,8 +210,12 @@ def upgrade() -> None:
         sa.Column("total", sa.Numeric(10, 2), nullable=False),
         sa.Column("stripe_payment_intent_id", sa.String(255), nullable=True),
         sa.Column("notes", sa.Text, nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
     )
     op.create_index("ix_order_user_id", "order", ["user_id"])
     op.create_index("ix_order_order_number", "order", ["order_number"], unique=True)
@@ -164,16 +225,28 @@ def upgrade() -> None:
     op.create_table(
         "order_item",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("order_id", postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey("order.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("product_id", postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey("product.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "order_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("order.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "product_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("product.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         sa.Column("product_name", sa.String(255), nullable=False),
         sa.Column("product_slug", sa.String(280), nullable=False),
         sa.Column("unit_price", sa.Numeric(10, 2), nullable=False),
         sa.Column("quantity", sa.Integer, nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
     )
     op.create_index("ix_order_item_order_id", "order_item", ["order_id"])
 

@@ -80,6 +80,11 @@ ignore = [
     "B008",  # function call in default arg — required by FastAPI's Depends()
 ]
 
+[tool.ruff.lint.isort]
+# The local alembic/ migrations folder would otherwise make Ruff treat the alembic
+# package as first-party and sort it in with the app's own imports.
+known-third-party = ["alembic"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["RUF059", "SIM117"]
 "alembic/**/*.py" = ["E501"]

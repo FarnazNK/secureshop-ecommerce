@@ -3,6 +3,7 @@
 Run: python aws_agentcore/demo_offline.py
 This demo intentionally uses fake response objects and never imports boto3.
 """
+
 from __future__ import annotations
 
 import io
@@ -24,7 +25,9 @@ class OfflineAgentCore:
         return {
             "statusCode": 200,
             "response": io.BytesIO(
-                json.dumps({"answer": "Offline demo: authorized context received."}).encode()
+                json.dumps(
+                    {"answer": "Offline demo: authorized context received."}
+                ).encode()
             ),
         }
 
