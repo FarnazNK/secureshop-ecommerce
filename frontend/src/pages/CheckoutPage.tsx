@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { api, isApiError } from '../utils/api';
@@ -16,6 +16,9 @@ export function CheckoutPage() {
   const navigate = useNavigate();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // One key per checkout attempt, reused if the request is retried (double-click, network
+  // error, token refresh), so the server places the order at most once.
+  const idempotencyKey = useRef(crypto.randomUUID());
 
   useEffect(() => {
     if (cart && cart.items.length === 0) {
@@ -34,9 +37,11 @@ export function CheckoutPage() {
     setError(null);
 
     try {
-      const response = await api.post<CreateOrderResponse>('/orders', {
-        notes: 'Portfolio demo checkout',
-      });
+      const response = await api.post<CreateOrderResponse>(
+        '/orders',
+        { notes: 'Portfolio demo checkout' },
+        { headers: { 'Idempotency-Key': idempotencyKey.current } },
+      );
       await refreshCart();
       navigate(`/orders/${response.data.order.id}?success=true`);
     } catch (err) {

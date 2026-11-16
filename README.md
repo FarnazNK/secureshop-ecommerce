@@ -19,7 +19,7 @@
 | **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, React Router, React Query |
 | **Backend** | Python, FastAPI (async), SQLAlchemy 2.0, PostgreSQL, Alembic, Pydantic v2 |
 | **Security** | JWT access + refresh tokens, token rotation with reuse detection, bcrypt, RBAC, rate limiting, CSP/HSTS headers |
-| **Quality** | 26 backend tests (pytest) run against real PostgreSQL and Redis in CI, Ruff lint/format, CodeQL, dependency audits |
+| **Quality** | 40 backend tests (pytest) run against real PostgreSQL and Redis in CI, Ruff lint/format, CodeQL, dependency audits |
 | **Deployed on** | Vercel (storefront + API) with Neon PostgreSQL |
 
 ## What I built
@@ -34,7 +34,14 @@ Security-headers middleware (CSP, HSTS in production, X-Frame-Options, Referrer-
 
 ### 💳 Orders and payments done safely
 Money is stored as exact decimals (`Numeric(10, 2)`), never floats. Each order item **snapshots** the product name and price at purchase time, so receipts stay correct if the catalog changes. Card data never touches the database: payments go through **Stripe payment intents** created server-side.
-→ [`backend/app/api/v1/orders.py`](backend/app/api/v1/orders.py), [`backend/app/models/`](backend/app/models/)
+
+Checkout is one transaction and is safe to retry or race:
+- **Idempotent:** the storefront sends an `Idempotency-Key` per checkout attempt. A retried request (double-click, dropped connection) gets the original order back instead of a second one; concurrent duplicates wait on Postgres's unique constraint, then replay. Stripe receives a matching idempotency key, so a retry never creates a second payment intent.
+- **No overselling:** stock is reserved with an atomic `UPDATE … WHERE stock_quantity >= qty`, locked in product-id order to avoid deadlocks. Four buyers racing for the last unit get one order and three clean 409s.
+- **Webhooks:** `POST /api/v1/payments/stripe/webhook` verifies Stripe's signature and records each event id in the same transaction as its effect, so redelivered events change nothing. A successful payment marks the order paid only if the amount matches; a canceled intent cancels the order and returns its stock.
+
+These are tested against real PostgreSQL with forced concurrency ([`tests/test_checkout_postgres.py`](backend/tests/test_checkout_postgres.py)). To receive webhooks, add an endpoint for `/api/v1/payments/stripe/webhook` in the Stripe dashboard (events `payment_intent.succeeded` and `payment_intent.canceled`) and set `STRIPE_WEBHOOK_SECRET`.
+→ [`backend/app/api/v1/orders.py`](backend/app/api/v1/orders.py), [`backend/app/api/v1/payments.py`](backend/app/api/v1/payments.py), [`backend/app/models/`](backend/app/models/)
 
 ### 🛍️ Storefront
 API-backed catalog with search, category and price filters and sorting kept in the URL (so filtered views are shareable), loading, empty and error states, product pages with stock info, and cart and account flows. Responsive and keyboard accessible.
@@ -58,15 +65,16 @@ flowchart LR
 
     subgraph BE["FastAPI · Vercel"]
         MW["Security headers · CORS<br/>rate limits · request IDs"]
-        Routes["Routes: auth, products,<br/>cart, orders"]
+        Routes["Routes: auth, products,<br/>cart, orders, payments"]
         Services["Service layer<br/>(auth, token rotation)"]
     end
 
-    DB[("PostgreSQL<br/>users · products · carts<br/>orders · refresh tokens")]
+    DB[("PostgreSQL<br/>users · products · carts<br/>orders · refresh tokens<br/>idempotency keys · webhook events")]
     Stripe["Stripe<br/>(payment intents)"]
 
     UI -->|"/api/* HTTPS"| MW --> Routes --> Services --> DB
     Routes -.->|optional| Stripe
+    Stripe -.->|signed webhooks| Routes
 ```
 
 Route handlers stay thin; business logic lives in `app/services/`, so it can be tested without an HTTP server. Pydantic schemas (the API contract) are kept separate from SQLAlchemy models (the database), so either can change without breaking the other.
@@ -99,7 +107,8 @@ npm install && npm run dev         # storefront on :5173
 | Auth | `POST /api/v1/auth/register` · `login` · `refresh` · `logout` · `GET /api/v1/auth/me` |
 | Products | `GET /api/v1/products` (filters, pagination) · `GET /{id}` · admin-only `POST` / `PATCH` / `DELETE` |
 | Cart | `GET /api/v1/cart` · `POST /items` · `PATCH /items/{id}` · `DELETE /items/{id}` · `DELETE` |
-| Orders | `POST /api/v1/orders` (creates a Stripe payment intent) · `GET /api/v1/orders` · `GET /{id}` |
+| Orders | `POST /api/v1/orders` (accepts `Idempotency-Key`; creates a Stripe payment intent) · `GET /api/v1/orders` · `GET /{id}` |
+| Payments | `POST /api/v1/payments/stripe/webhook` (Stripe-signed events only) |
 | Health | `GET /api/v1/health` (API and database) |
 
 Full interactive reference: **[secureshop-api.vercel.app/api/reference](https://secureshop-api.vercel.app/api/reference)**
@@ -108,7 +117,7 @@ Full interactive reference: **[secureshop-api.vercel.app/api/reference](https://
 
 This is a portfolio project. Products and data are synthetic, and nothing is really sold.
 
-- **Payments:** live Stripe payments and the payment webhook are not enabled, so orders stay in `PENDING`.
+- **Payments:** the hosted demo has no Stripe account connected, so its orders stay in `PENDING`. The webhook that moves them to paid or cancelled is implemented and tested against PostgreSQL.
 - **Email:** account and order emails aren't sent.
 - **Rate limiting:** the hosted limiter is per process. A shared Redis-backed limiter is set up for local Docker but not used in the hosted demo.
 - **Frontend tests:** the storefront has no automated UI tests yet. Backend security logic is where the tests focus.
@@ -129,7 +138,7 @@ None of these need a paid account.
 | Path | What's there |
 | --- | --- |
 | [`backend/app/`](backend/app/) | FastAPI app: routes, services, models, schemas, middleware, security |
-| [`backend/tests/`](backend/tests/) | Security, schema, config and database tests |
+| [`backend/tests/`](backend/tests/) | Security, schema and config tests; checkout concurrency and webhook tests on PostgreSQL |
 | [`frontend/src/`](frontend/src/) | React storefront: pages, components, auth and cart context |
 | [`.github/workflows/`](.github/workflows/) | CI, security scans, Kubernetes validation |
 | [`SECURITY.md`](SECURITY.md) | Security policy |
