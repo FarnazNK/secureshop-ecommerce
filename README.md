@@ -19,7 +19,7 @@
 | **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, React Router, React Query |
 | **Backend** | Python, FastAPI (async), SQLAlchemy 2.0, PostgreSQL, Alembic, Pydantic v2 |
 | **Security** | JWT access + refresh tokens, token rotation with reuse detection, bcrypt, RBAC, rate limiting, CSP/HSTS headers |
-| **Quality** | 26 backend tests (pytest) run against real PostgreSQL and Redis in CI, Ruff lint/format, CodeQL, dependency audits |
+| **Quality** | 40 backend tests (pytest) run against real PostgreSQL and Redis in CI, Ruff lint/format, CodeQL, dependency audits |
 | **Deployed on** | Vercel (storefront + API) with Neon PostgreSQL |
 
 ## What I built
@@ -34,7 +34,14 @@ Security-headers middleware (CSP, HSTS in production, X-Frame-Options, Referrer-
 
 ### 💳 Orders and payments done safely
 Money is stored as exact decimals (`Numeric(10, 2)`), never floats. Each order item **snapshots** the product name and price at purchase time, so receipts stay correct if the catalog changes. Card data never touches the database: payments go through **Stripe payment intents** created server-side.
-→ [`backend/app/api/v1/orders.py`](backend/app/api/v1/orders.py), [`backend/app/models/`](backend/app/models/)
+
+Checkout is one transaction and is safe to retry or race:
+- **Idempotent:** the storefront sends an `Idempotency-Key` per checkout attempt. A retried request (double-click, dropped connection) gets the original order back instead of a second one; concurrent duplicates wait on Postgres's unique constraint, then replay. Stripe receives a matching idempotency key, so a retry never creates a second payment intent.
+- **No overselling:** stock is reserved with an atomic `UPDATE … WHERE stock_quantity >= qty`, locked in product-id order to avoid deadlocks. Four buyers racing for the last unit get one order and three clean 409s.
+- **Webhooks:** `POST /api/v1/payments/stripe/webhook` verifies Stripe's signature and records each event id in the same transaction as its effect, so redelivered events change nothing. A successful payment marks the order paid only if the amount matches; a canceled intent cancels the order and returns its stock.
+
+These are tested against real PostgreSQL with forced concurrency ([`tests/test_checkout_postgres.py`](backend/tests/test_checkout_postgres.py)). To receive webhooks, add an endpoint for `/api/v1/payments/stripe/webhook` in the Stripe dashboard (events `payment_intent.succeeded` and `payment_intent.canceled`) and set `STRIPE_WEBHOOK_SECRET`.
+→ [`backend/app/api/v1/orders.py`](backend/app/api/v1/orders.py), [`backend/app/api/v1/payments.py`](backend/app/api/v1/payments.py), [`backend/app/models/`](backend/app/models/)
 
 ### 🛍️ Storefront
 API-backed catalog with search, category and price filters and sorting kept in the URL (so filtered views are shareable), loading, empty and error states, product pages with stock info, and cart and account flows. Responsive and keyboard accessible.

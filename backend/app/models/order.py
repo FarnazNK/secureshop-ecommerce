@@ -59,8 +59,10 @@ class Order(Base, UUIDMixin, TimestampMixin):
     )
     total: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
 
-    # Stripe payment intent — populated when the order is paid.
-    stripe_payment_intent_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Stripe payment intent, created at checkout. Unique so a webhook maps to one order.
+    stripe_payment_intent_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, unique=True
+    )
 
     # Free-form note from the customer (gift wrap, delivery instructions).
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
