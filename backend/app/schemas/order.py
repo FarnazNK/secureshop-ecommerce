@@ -43,6 +43,9 @@ class UpdateCartItemRequest(BaseModel):
 
 # --- Orders ---
 
+# Idempotency-Key header: 8-64 URL-safe characters (e.g. a UUID).
+IDEMPOTENCY_KEY_PATTERN = r"^[A-Za-z0-9_-]{8,64}$"
+
 
 class OrderItemOut(BaseModel):
     id: str
