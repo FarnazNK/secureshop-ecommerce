@@ -74,6 +74,10 @@ def create_app() -> FastAPI:
     # Move this state to Redis before running multiple API instances.
     @app.middleware("http")
     async def rate_limit_middleware(request: Request, call_next):
+        # Stripe delivers webhooks from shared IPs and retries on 429, so the
+        # webhook is exempt; its signature check is what protects it.
+        if request.url.path == "/api/v1/payments/webhook":
+            return await call_next(request)
         now = time.monotonic()
         auth_path = request.url.path in {
             "/api/v1/auth/login",
@@ -120,7 +124,7 @@ def create_app() -> FastAPI:
         allow_origins=settings.allowed_origins_list,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Idempotency-Key"],
         expose_headers=["X-Request-ID"],
         max_age=600,
     )

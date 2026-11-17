@@ -10,7 +10,7 @@ import uuid
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -33,6 +33,12 @@ class OrderStatus(enum.StrEnum):
 
 class Order(Base, UUIDMixin, TimestampMixin):
     """A placed order. Once created, only `status` and timestamps mutate."""
+
+    # One order per (user, Idempotency-Key): a double-clicked or retried
+    # checkout returns the original order instead of charging twice.
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="uq_order_user_idempotency_key"),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -59,8 +65,13 @@ class Order(Base, UUIDMixin, TimestampMixin):
     )
     total: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
 
-    # Stripe payment intent — populated when the order is paid.
-    stripe_payment_intent_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Stripe payment intent — set at checkout; the webhook marks the order paid.
+    stripe_payment_intent_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, unique=True, index=True
+    )
+
+    # Client-supplied Idempotency-Key header from checkout (optional).
+    idempotency_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # Free-form note from the customer (gift wrap, delivery instructions).
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

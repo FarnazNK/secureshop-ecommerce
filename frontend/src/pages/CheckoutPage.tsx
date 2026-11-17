@@ -16,6 +16,9 @@ export function CheckoutPage() {
   const navigate = useNavigate();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // One key per checkout attempt: if the request is retried or the button is
+  // double-clicked, the API returns the same order instead of creating two.
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
     if (cart && cart.items.length === 0) {
@@ -34,9 +37,11 @@ export function CheckoutPage() {
     setError(null);
 
     try {
-      const response = await api.post<CreateOrderResponse>('/orders', {
-        notes: 'Portfolio demo checkout',
-      });
+      const response = await api.post<CreateOrderResponse>(
+        '/orders',
+        { notes: 'Portfolio demo checkout' },
+        { headers: { 'Idempotency-Key': idempotencyKey } },
+      );
       await refreshCart();
       navigate(`/orders/${response.data.order.id}?success=true`);
     } catch (err) {
