@@ -67,19 +67,30 @@ class OrderOut(BaseModel):
     items: list[OrderItemOut]
     notes: str | None = None
     created_at: str
+    paid_at: str | None = None
 
     model_config = {"from_attributes": True}
 
 
 class CreateOrderRequest(BaseModel):
-    """Convert the current cart into an order. Stripe payment intent is
-    created server-side and its client secret is returned."""
+    """Convert the current cart into an order. When Stripe is configured, a
+    Checkout Session is created server-side and its URL is returned."""
 
     notes: str | None = Field(default=None, max_length=1000)
 
 
 class CreateOrderResponse(BaseModel):
     order: OrderOut
-    # Stripe client secret for the payment intent. Frontend uses this with
-    # Stripe Elements to confirm the payment.
-    payment_intent_client_secret: str | None = None
+    # Stripe-hosted payment page. The storefront redirects here; None when
+    # payments are not configured (demo mode).
+    checkout_url: str | None = None
+
+
+class CheckoutSessionResponse(BaseModel):
+    checkout_url: str
+
+
+class PaymentConfigOut(BaseModel):
+    enabled: bool
+    test_mode: bool
+    currency: str

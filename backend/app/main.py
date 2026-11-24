@@ -74,6 +74,10 @@ def create_app() -> FastAPI:
     # Move this state to Redis before running multiple API instances.
     @app.middleware("http")
     async def rate_limit_middleware(request: Request, call_next):
+        # Stripe webhooks are authenticated by signature and retried by Stripe;
+        # rate limiting them by IP would only drop real payment events.
+        if request.url.path == "/api/v1/payments/webhook":
+            return await call_next(request)
         now = time.monotonic()
         auth_path = request.url.path in {
             "/api/v1/auth/login",

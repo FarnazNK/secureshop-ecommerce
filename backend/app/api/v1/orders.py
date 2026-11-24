@@ -1,11 +1,12 @@
 """Order endpoints. Creating an order:
 1. Validates the cart (non-empty, all items in stock at current quantities).
-2. Snapshots prices/names into OrderItems.
-3. Creates a Stripe payment intent (if Stripe is configured).
+2. Snapshots prices/names into OrderItems and reserves stock.
+3. Creates a Stripe Checkout Session (if Stripe is configured).
 4. Clears the cart.
 
-The order starts in PENDING. A production Stripe webhook would transition
-it to PAID; that handler is intentionally not implemented in this portfolio version.
+The order starts in PENDING. The signed Stripe webhook (`/payments/webhook`)
+moves it to PAID, or to CANCELLED with stock returned if checkout expires.
+See `app/services/payments.py` for the full flow.
 """
 
 from __future__ import annotations
@@ -16,7 +17,6 @@ from datetime import UTC
 from decimal import Decimal
 from typing import Annotated
 
-import stripe
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,7 +29,13 @@ from app.db.session import get_db
 from app.models.cart import Cart, CartItem
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.user import User
-from app.schemas.order import CreateOrderRequest, CreateOrderResponse, OrderOut
+from app.schemas.order import (
+    CheckoutSessionResponse,
+    CreateOrderRequest,
+    CreateOrderResponse,
+    OrderOut,
+)
+from app.services import payments
 
 router = APIRouter()
 log = get_logger(__name__)
@@ -67,6 +73,7 @@ def _to_order_out(order: Order) -> OrderOut:
         ],
         notes=order.notes,
         created_at=order.created_at.isoformat(),
+        paid_at=order.paid_at.isoformat() if order.paid_at else None,
     )
 
 
@@ -109,6 +116,7 @@ async def create_order(
     total = subtotal + tax + shipping
 
     order = Order(
+        id=uuid.uuid4(),  # known before flush: the Checkout Session references it
         user_id=user.id,
         order_number=_generate_order_number(),
         status=OrderStatus.PENDING,
@@ -135,26 +143,17 @@ async def create_order(
 
     db.add(order)
 
-    # Stripe payment intent (only if configured). Creating the intent before
-    # commit means we avoid orphan orders if Stripe rejects.
-    payment_intent_secret: str | None = None
-    if settings.STRIPE_SECRET_KEY:
-        stripe.api_key = settings.STRIPE_SECRET_KEY
+    # Stripe Checkout Session (only if configured). Created before commit, so
+    # if Stripe rejects the request nothing is saved and the cart is untouched.
+    checkout_url: str | None = None
+    if payments.payments_enabled(settings):
         try:
-            intent = stripe.PaymentIntent.create(
-                amount=int(total * 100),  # Stripe expects cents
-                currency="usd",
-                metadata={
-                    "order_number": order.order_number,
-                    "user_id": str(user.id),
-                },
-                # idempotency_key would go here in real prod
+            session_id, checkout_url = await payments.create_checkout_session(
+                settings, order, customer_email=user.email
             )
-            order.stripe_payment_intent_id = intent.id
-            payment_intent_secret = intent.client_secret
-        except stripe.error.StripeError as exc:
-            log.error("stripe.payment_intent_failed", error=str(exc))
+        except payments.PaymentError as exc:
             raise HTTPException(502, detail="payment provider error") from exc
+        order.stripe_checkout_session_id = session_id
 
     # Clear cart only after we're sure the order is going through.
     for cart_item in list(cart.items):
@@ -164,10 +163,7 @@ async def create_order(
     await db.refresh(order, ["items"])
     log.info("order.created", order_id=str(order.id), order_number=order.order_number)
 
-    return CreateOrderResponse(
-        order=_to_order_out(order),
-        payment_intent_client_secret=payment_intent_secret,
-    )
+    return CreateOrderResponse(order=_to_order_out(order), checkout_url=checkout_url)
 
 
 @router.get("", response_model=list[OrderOut])
@@ -205,4 +201,96 @@ async def get_order(
     )
     if order is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="order not found")
+    return _to_order_out(order)
+
+
+async def _owned_order_for_payment(order_id: str, user: User, db: AsyncSession) -> Order:
+    try:
+        oid = uuid.UUID(order_id)
+    except ValueError as exc:
+        raise HTTPException(400, detail="invalid order_id") from exc
+    order = await payments.load_order_for_payment(db, oid)
+    if order is None or order.user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="order not found")
+    return order
+
+
+@router.post(
+    "/{order_id}/checkout-session",
+    response_model=CheckoutSessionResponse,
+    summary="Get a Stripe payment page for a pending order (Pay now / retry)",
+)
+async def create_order_checkout_session(
+    order_id: str,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> CheckoutSessionResponse:
+    settings = get_settings()
+    if not payments.payments_enabled(settings):
+        raise HTTPException(503, detail="payments are not configured")
+    order = await _owned_order_for_payment(order_id, user, db)
+    if order.status != OrderStatus.PENDING:
+        raise HTTPException(409, detail=f"order is {order.status.value}, not awaiting payment")
+
+    # One payment page per order: reuse the open one instead of creating a
+    # second, so a customer can never pay twice for the same order.
+    try:
+        if order.stripe_checkout_session_id:
+            current = await payments.retrieve_checkout_session(
+                settings, order.stripe_checkout_session_id
+            )
+            outcome = await payments.apply_checkout_session(order, current, settings=settings)
+            if outcome in {"paid", "cancelled"}:
+                await db.commit()
+                detail = (
+                    "order is already paid"
+                    if outcome == "paid"
+                    else "checkout expired and the order was cancelled; its items were restocked"
+                )
+                raise HTTPException(409, detail=detail)
+            url = payments.field(current, "url")
+            if payments.field(current, "status") == "open" and url:
+                return CheckoutSessionResponse(checkout_url=url)
+            raise HTTPException(409, detail="a payment for this order is still processing")
+        session_id, url = await payments.create_checkout_session(
+            settings, order, customer_email=user.email, attempt=1
+        )
+    except payments.PaymentError as exc:
+        raise HTTPException(502, detail="payment provider error") from exc
+
+    order.stripe_checkout_session_id = session_id
+    await db.commit()
+    return CheckoutSessionResponse(checkout_url=url)
+
+
+@router.post(
+    "/{order_id}/sync-payment",
+    response_model=OrderOut,
+    summary="Re-check payment with Stripe (used after returning from checkout)",
+)
+async def sync_order_payment(
+    order_id: str,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> OrderOut:
+    """The webhook is the source of truth, but it can arrive a few seconds after
+    the customer is redirected back. This applies the same idempotent update
+    from a direct Stripe lookup so the order page is correct immediately."""
+    settings = get_settings()
+    order = await _owned_order_for_payment(order_id, user, db)
+    if (
+        payments.payments_enabled(settings)
+        and order.status == OrderStatus.PENDING
+        and order.stripe_checkout_session_id
+    ):
+        try:
+            session = await payments.retrieve_checkout_session(
+                settings, order.stripe_checkout_session_id
+            )
+        except payments.PaymentError as exc:
+            raise HTTPException(502, detail="payment provider error") from exc
+        outcome = await payments.apply_checkout_session(order, session, settings=settings)
+        if outcome in {"paid", "cancelled"}:
+            await db.commit()
+            await db.refresh(order, ["items"])
     return _to_order_out(order)

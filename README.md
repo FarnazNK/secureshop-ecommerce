@@ -19,7 +19,7 @@
 | **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, React Router, React Query |
 | **Backend** | Python, FastAPI (async), SQLAlchemy 2.0, PostgreSQL, Alembic, Pydantic v2 |
 | **Security** | JWT access + refresh tokens, token rotation with reuse detection, bcrypt, RBAC, rate limiting, CSP/HSTS headers |
-| **Quality** | 26 backend tests (pytest) run against real PostgreSQL and Redis in CI, Ruff lint/format, CodeQL, dependency audits |
+| **Quality** | 38 backend tests (pytest) run against real PostgreSQL and Redis in CI, Ruff lint/format, CodeQL, dependency audits |
 | **Deployed on** | Vercel (storefront + API) with Neon PostgreSQL |
 
 ## What I built
@@ -33,8 +33,8 @@ Security-headers middleware (CSP, HSTS in production, X-Frame-Options, Referrer-
 → [`backend/app/middleware/`](backend/app/middleware/), [`backend/app/core/config.py`](backend/app/core/config.py)
 
 ### 💳 Orders and payments done safely
-Money is stored as exact decimals (`Numeric(10, 2)`), never floats. Each order item **snapshots** the product name and price at purchase time, so receipts stay correct if the catalog changes. Card data never touches the database: payments go through **Stripe payment intents** created server-side.
-→ [`backend/app/api/v1/orders.py`](backend/app/api/v1/orders.py), [`backend/app/models/`](backend/app/models/)
+Money is stored as exact decimals (`Numeric(10, 2)`), never floats. Each order item **snapshots** the product name and price at purchase time, so receipts stay correct if the catalog changes. Card data never touches this site: checkout redirects to a **Stripe Checkout** page created server-side. Placing an order reserves stock; a **signature-verified Stripe webhook** marks the order paid, or cancels it and returns the stock if checkout expires. The webhook handler is idempotent (Stripe retries are safe), only accepts a session that belongs to the order, and refuses to mark an order paid if the amount or currency Stripe charged doesn't match the order total. A customer can't pay twice: "Pay now" reuses the open payment page instead of creating another.
+→ [`backend/app/services/payments.py`](backend/app/services/payments.py), [`backend/app/api/v1/payments.py`](backend/app/api/v1/payments.py), [`backend/tests/test_payments.py`](backend/tests/test_payments.py)
 
 ### 🛍️ Storefront
 API-backed catalog with search, category and price filters and sorting kept in the URL (so filtered views are shareable), loading, empty and error states, product pages with stock info, and cart and account flows. Responsive and keyboard accessible.
@@ -63,10 +63,11 @@ flowchart LR
     end
 
     DB[("PostgreSQL<br/>users · products · carts<br/>orders · refresh tokens")]
-    Stripe["Stripe<br/>(payment intents)"]
+    Stripe["Stripe Checkout<br/>(hosted payment page)"]
 
     UI -->|"/api/* HTTPS"| MW --> Routes --> Services --> DB
-    Routes -.->|optional| Stripe
+    Routes -->|"Checkout Session"| Stripe
+    Stripe -->|"signed webhook"| Routes
 ```
 
 Route handlers stay thin; business logic lives in `app/services/`, so it can be tested without an HTTP server. Pydantic schemas (the API contract) are kept separate from SQLAlchemy models (the database), so either can change without breaking the other.
@@ -99,7 +100,8 @@ npm install && npm run dev         # storefront on :5173
 | Auth | `POST /api/v1/auth/register` · `login` · `refresh` · `logout` · `GET /api/v1/auth/me` |
 | Products | `GET /api/v1/products` (filters, pagination) · `GET /{id}` · admin-only `POST` / `PATCH` / `DELETE` |
 | Cart | `GET /api/v1/cart` · `POST /items` · `PATCH /items/{id}` · `DELETE /items/{id}` · `DELETE` |
-| Orders | `POST /api/v1/orders` (creates a Stripe payment intent) · `GET /api/v1/orders` · `GET /{id}` |
+| Orders | `POST /api/v1/orders` (reserves stock, returns a Stripe Checkout URL) · `GET /api/v1/orders` · `GET /{id}` · `POST /{id}/checkout-session` (Pay now) · `POST /{id}/sync-payment` |
+| Payments | `GET /api/v1/payments/config` · `POST /api/v1/payments/webhook` (Stripe only, signature-verified) |
 | Health | `GET /api/v1/health` (API and database) |
 
 Full interactive reference: **[secureshop-api.vercel.app/api/reference](https://secureshop-api.vercel.app/api/reference)**
@@ -108,7 +110,7 @@ Full interactive reference: **[secureshop-api.vercel.app/api/reference](https://
 
 This is a portfolio project. Products and data are synthetic, and nothing is really sold.
 
-- **Payments:** live Stripe payments and the payment webhook are not enabled, so orders stay in `PENDING`.
+- **Payments:** Stripe runs in **test mode**, so no real money moves. Pay with card `4242 4242 4242 4242`, any future expiry date and any CVC. Tax and shipping are fixed at zero. Refunds are not automated.
 - **Email:** account and order emails aren't sent.
 - **Rate limiting:** the hosted limiter is per process. A shared Redis-backed limiter is set up for local Docker but not used in the hosted demo.
 - **Frontend tests:** the storefront has no automated UI tests yet. Backend security logic is where the tests focus.

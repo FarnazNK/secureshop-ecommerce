@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import enum
 import uuid
+from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -61,6 +62,11 @@ class Order(Base, UUIDMixin, TimestampMixin):
 
     # Stripe payment intent — populated when the order is paid.
     stripe_payment_intent_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Current Stripe Checkout Session. Replaced when the customer retries payment.
+    stripe_checkout_session_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True
+    )
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Free-form note from the customer (gift wrap, delivery instructions).
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

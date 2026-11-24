@@ -1,0 +1,62 @@
+name: database migrations
+
+# Manual only. Applies Alembic migrations to the hosted (Neon) database from a
+# trusted runner, instead of on every request or in PR builds.
+# Setup once: Settings -> Secrets and variables -> Actions -> New repository secret
+#   PROD_DATABASE_URL = the Neon connection string (the same value as the API's DATABASE_URL)
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "migrate" to apply migrations to the hosted database'
+        required: true
+
+concurrency:
+  group: database-migrations
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    if: github.event.inputs.confirm == 'migrate'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    env:
+      DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+      DATABASE_SSL: "true"
+      # Required by Settings at import time; migrations don't use them.
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: migration-runner-placeholder-secret-32chars
+      JWT_REFRESH_SECRET: migration-runner-placeholder-secret-32chars-b
+      ENCRYPTION_KEY: migration-runner-placeholder-key-32-characters
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Check the secret is set
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Add the PROD_DATABASE_URL repository secret first."
+            exit 1
+          fi
+
+      - name: Install
+        run: pip install -e .
+
+      - name: Current revision
+        run: alembic current
+
+      - name: Apply migrations
+        run: alembic upgrade head
+
+      - name: New revision
+        run: alembic current

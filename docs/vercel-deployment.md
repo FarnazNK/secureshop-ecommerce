@@ -18,8 +18,9 @@ within quotas and is restricted to non-commercial personal use.
    process-local and does not connect to Redis; a syntactically valid local URL
    (`redis://localhost:6379`) is sufficient for this existing portfolio code.
    Do not provision a paid Redis service.
-7. Set `ALLOWED_ORIGINS` to the exact storefront origin,
-   `FRONTEND_URL` to its URL, and keep Stripe and SMTP keys unset.
+7. Set `ALLOWED_ORIGINS` to the exact storefront origin and `FRONTEND_URL` to
+   its URL (Stripe sends customers back there). Keep SMTP keys unset. For Stripe,
+   see "Payments (Stripe test mode)" below.
 8. Apply Alembic migrations from a trusted local environment before verification;
    do not run migrations on every request or against production in PR builds.
 
@@ -41,3 +42,25 @@ Check `/api/reference`, `/api/v1/health`, products, authentication, carts, and
 orders using synthetic data. Per-process rate limits are not globally shared on
 serverless hosts; this deployment is suitable for a bounded portfolio demo.
 Only retire Render after the replacement passes these checks.
+
+## Payments (Stripe test mode)
+
+Without `STRIPE_SECRET_KEY` the storefront shows the demo checkout. To take
+test payments:
+
+1. Apply migrations first (`0003_stripe_checkout` adds the order columns the new
+   code reads). Use the manual **database migrations** workflow in GitHub
+   Actions with the `PROD_DATABASE_URL` repository secret, or run
+   `alembic upgrade head` from a trusted machine.
+2. In the Stripe dashboard (test mode), copy the **secret key** (`sk_test_...`).
+3. Add a webhook endpoint: `https://<api-host>/api/v1/payments/webhook`, events
+   `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+   `checkout.session.async_payment_failed`, `checkout.session.expired`.
+   Copy its **signing secret** (`whsec_...`).
+4. Set on the API project: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+   (both as sensitive), and optionally `STRIPE_CURRENCY` (default `usd`).
+   Redeploy the API.
+5. Verify: buy something with card `4242 4242 4242 4242`; the order page should
+   show **Paid**, and the webhook's delivery log in Stripe should show `200`.
+
+Never use live keys for this portfolio demo.

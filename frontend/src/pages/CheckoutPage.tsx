@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { api, isApiError } from '../utils/api';
+import { fetchPaymentConfig, goToStripe, PaymentConfig, TEST_CARD } from '../utils/payments';
 
 interface CreateOrderResponse {
   order: {
     id: string;
     order_number: string;
   };
-  payment_intent_client_secret: string | null;
+  checkout_url: string | null;
 }
 
 export function CheckoutPage() {
@@ -16,12 +17,18 @@ export function CheckoutPage() {
   const navigate = useNavigate();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [payment, setPayment] = useState<PaymentConfig | null>(null);
 
   useEffect(() => {
-    if (cart && cart.items.length === 0) {
+    fetchPaymentConfig().then(setPayment);
+  }, []);
+
+  useEffect(() => {
+    // Don't bounce to /cart while redirecting to Stripe (the cart is cleared then).
+    if (cart && cart.items.length === 0 && !processing) {
       navigate('/cart');
     }
-  }, [cart, navigate]);
+  }, [cart, navigate, processing]);
 
   const formatPrice = (price: number) =>
     new Intl.NumberFormat('en-US', {
@@ -35,8 +42,13 @@ export function CheckoutPage() {
 
     try {
       const response = await api.post<CreateOrderResponse>('/orders', {
-        notes: 'Portfolio demo checkout',
+        notes: payment?.enabled ? null : 'Portfolio demo checkout',
       });
+      if (response.data.checkout_url) {
+        // Card details are entered on Stripe's page, never on this site.
+        goToStripe(response.data.checkout_url);
+        return;
+      }
       await refreshCart();
       navigate(`/orders/${response.data.order.id}?success=true`);
     } catch (err) {
@@ -45,7 +57,7 @@ export function CheckoutPage() {
     }
   };
 
-  if (!cart) {
+  if (!cart || !payment) {
     return (
       <div className="min-h-screen bg-sand-50 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-accent-600 border-t-transparent rounded-full" />
@@ -59,9 +71,13 @@ export function CheckoutPage() {
     <div className="min-h-screen bg-sand-50">
       <div className="bg-white border-b border-ink-100">
         <div className="container-page py-8">
-          <h1 className="text-display-lg font-display text-ink-900">Demo Checkout</h1>
+          <h1 className="text-display-lg font-display text-ink-900">
+            {payment.enabled ? 'Checkout' : 'Demo Checkout'}
+          </h1>
           <p className="text-ink-600 mt-2">
-            Portfolio mode: no real payment or shipping information is collected.
+            {payment.enabled
+              ? 'You will pay on a secure Stripe page, then come back here.'
+              : 'Portfolio mode: no real payment or shipping information is collected.'}
           </p>
         </div>
       </div>
@@ -76,14 +92,33 @@ export function CheckoutPage() {
             )}
 
             <div className="bg-white rounded-xl p-6 shadow-sm border border-ink-100">
-              <h2 className="font-display text-xl text-ink-900 mb-2">
-                Demo Payment
-              </h2>
-              <p className="text-ink-600">
-                This deployment does not charge a card. Placing the order creates a
-                synthetic portfolio order in PostgreSQL and clears the authenticated
-                cart.
-              </p>
+              {payment.enabled ? (
+                <>
+                  <h2 className="font-display text-xl text-ink-900 mb-2">Payment</h2>
+                  <p className="text-ink-600">
+                    Your items are reserved when you continue. Stripe handles the card
+                    details, and your order is marked paid as soon as Stripe confirms it.
+                  </p>
+                  {payment.testMode && (
+                    <div className="mt-4 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">
+                      <p className="font-medium">Test mode: no real money is charged.</p>
+                      <p className="mt-1">
+                        Use card <span className="font-mono">{TEST_CARD}</span>, any future
+                        expiry date, any 3-digit CVC and any postal code.
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <h2 className="font-display text-xl text-ink-900 mb-2">Demo Payment</h2>
+                  <p className="text-ink-600">
+                    This deployment does not charge a card. Placing the order creates a
+                    synthetic portfolio order in PostgreSQL and clears the authenticated
+                    cart.
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="bg-white rounded-xl p-6 shadow-sm border border-ink-100">
@@ -146,7 +181,13 @@ export function CheckoutPage() {
                 disabled={processing || cart.items.length === 0}
                 className="w-full btn-primary py-4 text-lg disabled:opacity-50"
               >
-                {processing ? 'Creating order…' : 'Place Demo Order'}
+                {processing
+                  ? payment.enabled
+                    ? 'Opening secure payment…'
+                    : 'Creating order…'
+                  : payment.enabled
+                    ? 'Continue to payment'
+                    : 'Place Demo Order'}
               </button>
             </div>
           </div>

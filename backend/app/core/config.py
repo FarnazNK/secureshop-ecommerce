@@ -78,6 +78,8 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None
     STRIPE_PUBLISHABLE_KEY: str | None = None
+    # ISO currency for Checkout Sessions. Catalog prices are stored in this currency.
+    STRIPE_CURRENCY: str = "usd"
 
     # --- Email / SMTP (optional) ---
     SMTP_HOST: str | None = None

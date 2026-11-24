@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api, isApiError } from '../utils/api';
+import { fetchPaymentConfig, goToStripe, PaymentConfig } from '../utils/payments';
 
 interface BackendOrderItem {
   id: string;
@@ -24,6 +25,7 @@ interface BackendOrder {
   items: BackendOrderItem[];
   notes?: string | null;
   created_at: string;
+  paid_at?: string | null;
 }
 
 interface OrderItem {
@@ -47,7 +49,13 @@ interface Order {
   items: OrderItem[];
   notes?: string | null;
   createdAt: string;
+  paidAt?: string | null;
 }
+
+type PaymentNotice = 'confirming' | 'paid' | 'processing' | 'cancelled' | null;
+
+const SYNC_ATTEMPTS = 6;
+const SYNC_INTERVAL_MS = 2000;
 
 function mapOrder(order: BackendOrder): Order {
   return {
@@ -69,6 +77,7 @@ function mapOrder(order: BackendOrder): Order {
     })),
     notes: order.notes,
     createdAt: order.created_at,
+    paidAt: order.paid_at,
   };
 }
 
@@ -79,11 +88,60 @@ export function OrdersPage() {
   const activeOrderId = orderId ?? routeId;
   const [searchParams] = useSearchParams();
   const isSuccess = searchParams.get('success') === 'true';
+  const checkoutResult = searchParams.get('checkout');
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [payment, setPayment] = useState<PaymentConfig | null>(null);
+  const [notice, setNotice] = useState<PaymentNotice>(null);
+  const [paying, setPaying] = useState(false);
+
+  useEffect(() => {
+    fetchPaymentConfig().then(setPayment);
+  }, []);
+
+  // After Stripe redirects back, confirm the payment directly with the API.
+  // The webhook is the source of truth; this just avoids showing "pending"
+  // for the few seconds before it arrives.
+  const confirmPayment = useCallback(async (id: string) => {
+    setNotice('confirming');
+    for (let attempt = 0; attempt < SYNC_ATTEMPTS; attempt += 1) {
+      try {
+        const { data } = await api.post<BackendOrder>(`/orders/${id}/sync-payment`, {});
+        const order = mapOrder(data);
+        setSelectedOrder(order);
+        if (order.status === 'paid') {
+          setNotice('paid');
+          return;
+        }
+        if (order.status === 'cancelled') {
+          setNotice('cancelled');
+          return;
+        }
+      } catch {
+        // Keep trying; a transient error here doesn't mean the payment failed.
+      }
+      await new Promise((resolve) => setTimeout(resolve, SYNC_INTERVAL_MS));
+    }
+    setNotice('processing');
+  }, []);
+
+  const payNow = async (id: string) => {
+    setPaying(true);
+    setError(null);
+    try {
+      const { data } = await api.post<{ checkout_url: string }>(
+        `/orders/${id}/checkout-session`,
+        {},
+      );
+      goToStripe(data.checkout_url);
+    } catch (err) {
+      setError(isApiError(err) ? err.message : 'Could not open the payment page');
+      setPaying(false);
+    }
+  };
 
   const formatPrice = (price: number) =>
     new Intl.NumberFormat('en-US', {
@@ -128,7 +186,14 @@ export function OrdersPage() {
     if (activeOrderId) {
       api
         .get<BackendOrder>(`/orders/${activeOrderId}`)
-        .then((response) => setSelectedOrder(mapOrder(response.data)))
+        .then((response) => {
+          setSelectedOrder(mapOrder(response.data));
+          if (checkoutResult === 'success') {
+            confirmPayment(activeOrderId);
+          } else if (checkoutResult === 'cancelled') {
+            setNotice('cancelled');
+          }
+        })
         .catch((err) => {
           setError(isApiError(err) ? err.message : 'Order not found');
         })
@@ -142,7 +207,7 @@ export function OrdersPage() {
         })
         .finally(() => setLoading(false));
     }
-  }, [user, navigate, activeOrderId]);
+  }, [user, navigate, activeOrderId, checkoutResult, confirmPayment]);
 
   if (loading) {
     return (
@@ -160,6 +225,31 @@ export function OrdersPage() {
             <div className="container-page">
               <p className="font-medium">
                 Demo order created successfully. No real payment was processed.
+              </p>
+            </div>
+          </div>
+        )}
+        {notice && (
+          <div
+            role="status"
+            className={`py-4 ${
+              notice === 'paid'
+                ? 'bg-green-600 text-white'
+                : notice === 'cancelled'
+                  ? 'bg-amber-100 text-amber-900'
+                  : 'bg-ink-900 text-white'
+            }`}
+          >
+            <div className="container-page">
+              <p className="font-medium">
+                {notice === 'confirming' && 'Confirming your payment with Stripe…'}
+                {notice === 'paid' && 'Payment received. Thank you, your order is confirmed.'}
+                {notice === 'processing' &&
+                  'Stripe is still processing your payment. This page will show Paid once it is confirmed; refresh in a minute.'}
+                {notice === 'cancelled' &&
+                  (selectedOrder.status === 'cancelled'
+                    ? 'This checkout expired, so the order was cancelled and its items were returned to stock.'
+                    : 'Payment was not completed. Your items stay reserved for about 30 minutes; use Pay now to finish.')}
               </p>
             </div>
           </div>
@@ -255,6 +345,23 @@ export function OrdersPage() {
                 {selectedOrder.notes && (
                   <p className="mt-4 text-sm text-ink-500">{selectedOrder.notes}</p>
                 )}
+                {selectedOrder.paidAt && (
+                  <p className="mt-4 text-sm text-ink-600">
+                    Paid on {formatDate(selectedOrder.paidAt)}
+                  </p>
+                )}
+                {payment?.enabled &&
+                  selectedOrder.status === 'pending' &&
+                  notice !== 'confirming' && (
+                    <button
+                      type="button"
+                      onClick={() => payNow(selectedOrder.id)}
+                      disabled={paying}
+                      className="w-full btn-primary py-3 mt-6 disabled:opacity-50"
+                    >
+                      {paying ? 'Opening secure payment…' : 'Pay now'}
+                    </button>
+                  )}
               </div>
             </div>
           </div>
