@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
+from app.core.rate_limit import prune_buckets
 from app.models.order import Order, OrderStatus
 from app.models.stripe_event import StripeEvent
 from app.services import payments
@@ -188,6 +189,7 @@ async def run(command: str, sessions: async_sessionmaker[AsyncSession] | None = 
     report: dict[str, Any] = {"command": command, "at": datetime.now(UTC).isoformat()}
     if command in {"retry-events", "all"}:
         report["retry_events"] = await retry_events(sessions)
+        report["pruned_rate_limit_buckets"] = await prune_buckets(sessions)
     if not payments.payments_enabled(settings):
         report["stripe"] = "not configured; skipped Stripe checks"
     else:

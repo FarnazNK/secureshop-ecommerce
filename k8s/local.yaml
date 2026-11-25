@@ -137,6 +137,13 @@ spec:
           value: "localhost,127.0.0.1,backend"
         - name: COOKIE_SECURE
           value: "false"
+        # Shared limiter + bounded pool so several replicas (k8s/scaling.yaml) behave.
+        - name: RATE_LIMIT_BACKEND
+          value: "database"
+        - name: DB_POOL_SIZE
+          value: "5"
+        - name: DB_MAX_OVERFLOW
+          value: "5"
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
@@ -175,6 +182,18 @@ spec:
             port: 3001
           initialDelaySeconds: 5
           periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 3001
+          initialDelaySeconds: 20
+          periodSeconds: 20
+          failureThreshold: 3
+        lifecycle:
+          preStop:
+            # Let the Service stop routing here before uvicorn shuts down.
+            exec:
+              command: ["sleep", "5"]
 ---
 apiVersion: v1
 kind: Service

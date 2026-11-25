@@ -8,7 +8,6 @@ handler. Returns an ASGI app that uvicorn can serve.
 from __future__ import annotations
 
 import time
-from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -22,6 +21,7 @@ from app.api.v1 import api_router
 from app.api_reference import render_api_reference
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
+from app.core.rate_limit import RATE_LIMITED, build_rate_limiter
 from app.middleware.request_logging import RequestLoggingMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 
@@ -31,8 +31,6 @@ METRIC_REQUESTS = Counter(
 METRIC_DURATION = Histogram("secureshop_http_duration_seconds", "HTTP latency", ["method", "route"])
 
 log = get_logger(__name__)
-
-_rate_windows: dict[str, deque[float]] = defaultdict(deque)
 
 
 def _client_ip(request: Request) -> str:
@@ -70,15 +68,16 @@ def create_app() -> FastAPI:
     )
 
     # --- Rate limiting ---
-    # Process-local is sufficient for the single-instance portfolio deployment.
-    # Move this state to Redis before running multiple API instances.
+    # RATE_LIMIT_BACKEND=memory counts per process; =database shares the count
+    # across every instance through the existing Postgres (see core/rate_limit).
+    app.state.rate_limiter = build_rate_limiter(settings.RATE_LIMIT_BACKEND)
+
     @app.middleware("http")
     async def rate_limit_middleware(request: Request, call_next):
         # Stripe webhooks are authenticated by signature and retried by Stripe;
         # rate limiting them by IP would only drop real payment events.
         if request.url.path == "/api/v1/payments/webhook":
             return await call_next(request)
-        now = time.monotonic()
         auth_path = request.url.path in {
             "/api/v1/auth/login",
             "/api/v1/auth/register",
@@ -94,13 +93,10 @@ def create_app() -> FastAPI:
             bucket = "api"
 
         key = f"{bucket}:{_client_ip(request)}"
-        events = _rate_windows[key]
-        while events and now - events[0] >= window_seconds:
-            events.popleft()
-        if len(events) >= limit:
-            retry_after = int(window_seconds - (now - events[0])) if events else window_seconds
-            return _rate_limit_response(retry_after)
-        events.append(now)
+        decision = await request.app.state.rate_limiter.hit(key, limit, window_seconds)
+        if not decision.allowed:
+            RATE_LIMITED.labels(bucket).inc()
+            return _rate_limit_response(decision.retry_after)
         return await call_next(request)
 
     @app.middleware("http")

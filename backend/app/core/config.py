@@ -30,7 +30,11 @@ class Settings(BaseSettings):
     PORT: int = 3001
     API_VERSION: str = "v1"
     ALLOWED_HOSTS: str = "api.secureshop.example,secureshop.example,*.onrender.com"
-    DB_POOL_DISABLED: bool = False
+    DB_POOL_DISABLED: bool = False  # True on serverless: one short connection per request
+    DB_POOL_SIZE: int = Field(default=5, ge=1, le=100)
+    DB_MAX_OVERFLOW: int = Field(default=5, ge=0, le=100)
+    DB_POOL_TIMEOUT_SECONDS: float = Field(default=5.0, gt=0)  # wait for a free connection
+    DB_COMMAND_TIMEOUT_SECONDS: float = Field(default=15.0, gt=0)  # per query
 
     # --- Database ---
     DATABASE_URL: PostgresDsn
@@ -68,6 +72,10 @@ class Settings(BaseSettings):
     RATE_LIMIT_MAX_REQUESTS: int = 100
     AUTH_RATE_LIMIT_WINDOW_MINUTES: int = 15
     AUTH_RATE_LIMIT_MAX_REQUESTS: int = 5  # tighter on auth endpoints
+    # "memory": per process (one server, or local dev).
+    # "database": counters in the existing Postgres, shared by every instance
+    # (serverless / several replicas). Costs one small upsert per request.
+    RATE_LIMIT_BACKEND: Literal["memory", "database"] = "memory"
 
     # --- Cookies ---
     COOKIE_SECURE: bool = True  # Set False only for local HTTP dev

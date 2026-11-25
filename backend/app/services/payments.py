@@ -425,7 +425,7 @@ async def process_event(db: AsyncSession, settings: Settings, event: dict[str, A
 async def process_stored_event(db: AsyncSession, record: Any, settings: Settings) -> str:
     """Process one stored `StripeEvent` and record the result. Never raises:
     a failure is saved on the row for the scheduled retry job."""
-    event_id = record.id
+    event_id, event_type = record.id, record.type
     try:
         outcome = await process_event(db, settings, record.payload)
     except Exception as exc:
@@ -437,6 +437,7 @@ async def process_stored_event(db: AsyncSession, record: Any, settings: Settings
             failed.last_error = f"{type(exc).__name__}: {exc}"[:2000]
             await db.commit()
         log.error("stripe.webhook_processing_failed", event_id=event_id, error=str(exc))
+        PAYMENT_OUTCOMES.labels(event_type, "failed_will_retry").inc()
         return "failed_will_retry"
     record.status = "ignored" if outcome.startswith("ignored") else "processed"
     record.outcome = outcome
