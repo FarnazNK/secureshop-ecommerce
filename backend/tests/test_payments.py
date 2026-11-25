@@ -37,11 +37,20 @@ from app.models.order import Order, OrderStatus
 from app.models.product import Product
 from app.models.user import User
 from app.schemas.order import CreateOrderRequest
+from app.services import payments
 
 WEBHOOK_SECRET = "whsec_test_secret_for_unit_tests"
 
 
 # --------------------------------------------------------------------------- fixtures
+@pytest.fixture(autouse=True)
+def fresh_breaker() -> Iterator[None]:
+    """The Stripe circuit breaker is per process; isolate it between tests."""
+    payments._breaker = None
+    yield
+    payments._breaker = None
+
+
 @pytest.fixture
 def stripe_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_unit")
@@ -151,7 +160,9 @@ async def seed_cart(db: AsyncSession) -> tuple[User, Product]:
 async def place_order(sessions: async_sessionmaker[AsyncSession]) -> tuple[Any, User, Product]:
     async with sessions() as db:
         user, product = await seed_cart(db)
-        response = await create_order(CreateOrderRequest(notes=None), user=user, db=db)
+        response = await create_order(
+            CreateOrderRequest(notes=None), user=user, db=db, idempotency_key=None
+        )
     return response, user, product
 
 
@@ -236,8 +247,12 @@ async def test_stripe_failure_saves_nothing(
         user, product = await seed_cart(db)
         product_id = product.id
         with pytest.raises(HTTPException) as exc:
-            await create_order(CreateOrderRequest(notes=None), user=user, db=db)
-        assert exc.value.status_code == 502
+            await create_order(
+                CreateOrderRequest(notes=None), user=user, db=db, idempotency_key=None
+            )
+        # Network trouble = Stripe unavailable: 503 + Retry-After, cart kept.
+        assert exc.value.status_code == 503
+        assert exc.value.headers["Retry-After"]
         await db.rollback()  # what get_db does on an exception
     async with sessions() as db:
         assert (await db.scalars(select(Order))).all() == []

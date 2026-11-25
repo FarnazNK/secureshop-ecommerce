@@ -20,18 +20,22 @@ currency Stripe charged match the order total.
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
 import stripe
-from sqlalchemy import select
+from prometheus_client import Counter, Histogram
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.circuit_breaker import CircuitBreaker, CircuitOpenError
 from app.core.config import Settings
 from app.core.logging import get_logger
 from app.models.order import Order, OrderItem, OrderStatus
+from app.models.product import Product
 
 log = get_logger(__name__)
 
@@ -44,6 +48,57 @@ FAILED_EVENTS = {"checkout.session.expired", "checkout.session.async_payment_fai
 
 class PaymentError(Exception):
     """Raised when Stripe rejects a request or returns data we can't trust."""
+
+
+class PaymentUnavailableError(PaymentError):
+    """Stripe is failing or slow right now; callers should answer 503 and keep
+    the customer's cart so they can try again shortly."""
+
+    def __init__(self, retry_after: int) -> None:
+        super().__init__("payments are temporarily unavailable")
+        self.retry_after = retry_after
+
+
+STRIPE_CALLS = Counter("secureshop_stripe_calls_total", "Stripe API calls by outcome", ["outcome"])
+STRIPE_LATENCY = Histogram("secureshop_stripe_call_seconds", "Stripe API call latency")
+
+_breaker: CircuitBreaker | None = None
+_http_client: Any = None
+
+
+def get_breaker(settings: Settings) -> CircuitBreaker:
+    global _breaker
+    if _breaker is None:
+        _breaker = CircuitBreaker(
+            "stripe",
+            failure_threshold=settings.STRIPE_BREAKER_FAILURE_THRESHOLD,
+            window_seconds=settings.STRIPE_BREAKER_WINDOW_SECONDS,
+            reset_timeout_seconds=settings.STRIPE_BREAKER_RESET_SECONDS,
+        )
+    return _breaker
+
+
+def _configure_stripe(settings: Settings) -> None:
+    """Short timeout + bounded retries. Retries are safe because every write
+    we send carries an idempotency key."""
+    global _http_client
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    stripe.max_network_retries = settings.STRIPE_MAX_NETWORK_RETRIES
+    if (
+        _http_client is None
+        or getattr(_http_client, "_timeout", None) != settings.STRIPE_TIMEOUT_SECONDS
+    ):
+        _http_client = stripe.RequestsClient(timeout=settings.STRIPE_TIMEOUT_SECONDS)
+        stripe.default_http_client = _http_client
+
+
+def is_transient(exc: Exception) -> bool:
+    """Errors that mean Stripe is unhealthy (count toward the breaker), as
+    opposed to Stripe answering 'no' to a bad request (it is healthy)."""
+    if isinstance(exc, stripe.APIConnectionError | stripe.RateLimitError):
+        return True
+    status = getattr(exc, "http_status", None)
+    return isinstance(exc, stripe.APIError) or (status is not None and status >= 500)
 
 
 def payments_enabled(settings: Settings) -> bool:
@@ -72,13 +127,36 @@ def field(obj: Any, key: str) -> Any:
 
 
 async def _stripe_call(settings: Settings, fn: Any, *args: Any, **kwargs: Any) -> Any:
-    """Run a blocking Stripe SDK call in a worker thread with the configured key."""
-    stripe.api_key = settings.STRIPE_SECRET_KEY
+    """Run a blocking Stripe SDK call in a worker thread, behind the circuit breaker."""
+    _configure_stripe(settings)
+    breaker = get_breaker(settings)
     try:
-        return await asyncio.to_thread(fn, *args, **kwargs)
+        breaker.before_call()
+    except CircuitOpenError as exc:
+        STRIPE_CALLS.labels("rejected_open_circuit").inc()
+        raise PaymentUnavailableError(exc.retry_after) from exc
+    started = time.monotonic()
+    try:
+        result = await asyncio.to_thread(fn, *args, **kwargs)
     except stripe.StripeError as exc:
-        log.error("stripe.request_failed", error=str(exc), call=getattr(fn, "__qualname__", ""))
+        STRIPE_LATENCY.observe(time.monotonic() - started)
+        call = getattr(fn, "__qualname__", "")
+        if is_transient(exc):
+            breaker.record_failure()
+            STRIPE_CALLS.labels("transient_error").inc()
+            log.error("stripe.unavailable", error=str(exc), call=call, circuit=breaker.state.name)
+            raise PaymentUnavailableError(int(settings.STRIPE_BREAKER_RESET_SECONDS)) from exc
+        breaker.record_success()  # Stripe answered; the request itself was rejected
+        STRIPE_CALLS.labels("rejected_by_stripe").inc()
+        log.error("stripe.request_failed", error=str(exc), call=call)
         raise PaymentError("payment provider error") from exc
+    except BaseException:
+        breaker.abandon_trial()  # cancelled/unexpected: don't leave a half-open trial stuck
+        raise
+    STRIPE_LATENCY.observe(time.monotonic() - started)
+    breaker.record_success()
+    STRIPE_CALLS.labels("ok").inc()
+    return result
 
 
 async def create_checkout_session(
@@ -139,17 +217,29 @@ async def load_order_for_payment(db: AsyncSession, order_id: Any) -> Order | Non
     )
 
 
-async def cancel_and_restock(order: Order) -> None:
-    """Cancel a PENDING order and return its reserved stock."""
+async def cancel_and_restock(db: AsyncSession, order: Order) -> None:
+    """Cancel a PENDING order and return its reserved stock.
+
+    Stock is returned with an atomic `stock = stock + n` UPDATE, never
+    read-modify-write, so a concurrent purchase of the same product can't be
+    lost. Products are updated in id order so concurrent transactions lock rows
+    in the same order (no deadlocks)."""
     if order.status != OrderStatus.PENDING:
         return
-    for item in order.items:
-        if item.product is not None:
-            item.product.stock_quantity += item.quantity
+    for item in sorted(order.items, key=lambda i: str(i.product_id)):
+        if item.product_id is None:
+            continue
+        await db.execute(
+            update(Product)
+            .where(Product.id == item.product_id)
+            .values(stock_quantity=Product.stock_quantity + item.quantity)
+            .execution_options(synchronize_session=False)
+        )
     order.status = OrderStatus.CANCELLED
 
 
 async def apply_checkout_session(
+    db: AsyncSession,
     order: Order,
     session: Any,
     *,
@@ -209,7 +299,7 @@ async def apply_checkout_session(
             return "ignored_stale_session"
         if order.status != OrderStatus.PENDING:
             return "already_final"
-        await cancel_and_restock(order)
+        await cancel_and_restock(db, order)
         log.info("payment.order_cancelled", order_id=str(order.id), session_id=session_id)
         return "cancelled"
 

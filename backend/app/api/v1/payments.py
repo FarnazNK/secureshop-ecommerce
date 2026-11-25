@@ -79,7 +79,7 @@ async def stripe_webhook(
         return {"status": "ignored"}
 
     outcome = await payments.apply_checkout_session(
-        order, session, settings=settings, event_type=event_type
+        db, order, session, settings=settings, event_type=event_type
     )
     await db.commit()
     log.info(

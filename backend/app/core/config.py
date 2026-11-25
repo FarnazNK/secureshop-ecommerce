@@ -80,6 +80,12 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str | None = None
     # ISO currency for Checkout Sessions. Catalog prices are stored in this currency.
     STRIPE_CURRENCY: str = "usd"
+    # Resilience: fail fast instead of letting a slow Stripe stall the API.
+    STRIPE_TIMEOUT_SECONDS: float = Field(default=10.0, gt=0, le=60)
+    STRIPE_MAX_NETWORK_RETRIES: int = Field(default=2, ge=0, le=5)
+    STRIPE_BREAKER_FAILURE_THRESHOLD: int = Field(default=5, ge=1)
+    STRIPE_BREAKER_WINDOW_SECONDS: float = Field(default=60.0, gt=0)
+    STRIPE_BREAKER_RESET_SECONDS: float = Field(default=30.0, gt=0)
 
     # --- Email / SMTP (optional) ---
     SMTP_HOST: str | None = None
