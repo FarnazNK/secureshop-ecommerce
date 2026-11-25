@@ -7,7 +7,7 @@ import math
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -26,6 +26,12 @@ from app.schemas.product import (
 
 router = APIRouter()
 
+# Public catalogue reads can be served by the CDN in front of the API (Vercel's
+# edge cache is included in the free plan) for 30s, then refreshed in the
+# background. Stock shown may lag by up to a minute; order creation re-checks
+# stock atomically, so a stale page can never cause an oversell.
+PUBLIC_CACHE = "public, max-age=0, s-maxage=30, stale-while-revalidate=60"
+
 
 @router.get(
     "",
@@ -33,6 +39,7 @@ router = APIRouter()
     summary="List products with pagination and filters",
 )
 async def list_products(
+    response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
     page: int = Query(default=1, ge=1, le=10_000),
     limit: int = Query(default=20, ge=1, le=100),
@@ -71,6 +78,7 @@ async def list_products(
     products = (await db.execute(stmt)).scalars().all()
 
     total_pages = max(1, math.ceil(total / limit))
+    response.headers["Cache-Control"] = PUBLIC_CACHE
     return ProductPage(
         items=[ProductOut.model_validate(p) for p in products],
         meta=PageMeta(
@@ -87,6 +95,7 @@ async def list_products(
 @router.get("/{product_id}", response_model=ProductOut)
 async def get_product(
     product_id: str,
+    response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ProductOut:
     try:
@@ -103,6 +112,7 @@ async def get_product(
     product = await db.scalar(stmt)
     if product is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="product not found")
+    response.headers["Cache-Control"] = PUBLIC_CACHE
     return ProductOut.model_validate(product)
 
 

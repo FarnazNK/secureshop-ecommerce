@@ -11,7 +11,17 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import (
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,6 +44,13 @@ class OrderStatus(enum.StrEnum):
 
 class Order(Base, UUIDMixin, TimestampMixin):
     """A placed order. Once created, only `status` and timestamps mutate."""
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="uq_order_user_idempotency_key"),
+        # "My orders, newest first" and the stale-reservation sweeper.
+        Index("ix_order_user_created", "user_id", "created_at"),
+        Index("ix_order_status_created", "status", "created_at"),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -60,13 +77,24 @@ class Order(Base, UUIDMixin, TimestampMixin):
     )
     total: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
 
-    # Stripe payment intent — populated when the order is paid.
-    stripe_payment_intent_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Stripe payment intent — populated when the order is paid. Indexed because
+    # refund and dispute webhooks look orders up by it.
+    stripe_payment_intent_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True
+    )
     # Current Stripe Checkout Session. Replaced when the customer retries payment.
     stripe_checkout_session_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True, index=True
     )
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Client-supplied Idempotency-Key for POST /orders. Unique per user, so a
+    # retried or double-clicked checkout returns the first order, not a second one.
+    idempotency_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Refunds and disputes (chargebacks), kept in sync by Stripe webhooks.
+    amount_refunded: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), default=Decimal("0.00"), server_default="0", nullable=False
+    )
+    dispute_status: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
     # Free-form note from the customer (gift wrap, delivery instructions).
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

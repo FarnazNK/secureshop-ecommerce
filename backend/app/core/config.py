@@ -30,7 +30,11 @@ class Settings(BaseSettings):
     PORT: int = 3001
     API_VERSION: str = "v1"
     ALLOWED_HOSTS: str = "api.secureshop.example,secureshop.example,*.onrender.com"
-    DB_POOL_DISABLED: bool = False
+    DB_POOL_DISABLED: bool = False  # True on serverless: one short connection per request
+    DB_POOL_SIZE: int = Field(default=5, ge=1, le=100)
+    DB_MAX_OVERFLOW: int = Field(default=5, ge=0, le=100)
+    DB_POOL_TIMEOUT_SECONDS: float = Field(default=5.0, gt=0)  # wait for a free connection
+    DB_COMMAND_TIMEOUT_SECONDS: float = Field(default=15.0, gt=0)  # per query
 
     # --- Database ---
     DATABASE_URL: PostgresDsn
@@ -68,6 +72,10 @@ class Settings(BaseSettings):
     RATE_LIMIT_MAX_REQUESTS: int = 100
     AUTH_RATE_LIMIT_WINDOW_MINUTES: int = 15
     AUTH_RATE_LIMIT_MAX_REQUESTS: int = 5  # tighter on auth endpoints
+    # "memory": per process (one server, or local dev).
+    # "database": counters in the existing Postgres, shared by every instance
+    # (serverless / several replicas). Costs one small upsert per request.
+    RATE_LIMIT_BACKEND: Literal["memory", "database"] = "memory"
 
     # --- Cookies ---
     COOKIE_SECURE: bool = True  # Set False only for local HTTP dev
@@ -80,6 +88,12 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str | None = None
     # ISO currency for Checkout Sessions. Catalog prices are stored in this currency.
     STRIPE_CURRENCY: str = "usd"
+    # Resilience: fail fast instead of letting a slow Stripe stall the API.
+    STRIPE_TIMEOUT_SECONDS: float = Field(default=10.0, gt=0, le=60)
+    STRIPE_MAX_NETWORK_RETRIES: int = Field(default=2, ge=0, le=5)
+    STRIPE_BREAKER_FAILURE_THRESHOLD: int = Field(default=5, ge=1)
+    STRIPE_BREAKER_WINDOW_SECONDS: float = Field(default=60.0, gt=0)
+    STRIPE_BREAKER_RESET_SECONDS: float = Field(default=30.0, gt=0)
 
     # --- Email / SMTP (optional) ---
     SMTP_HOST: str | None = None

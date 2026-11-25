@@ -10,7 +10,7 @@ import uuid
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -32,6 +32,11 @@ class Category(Base, UUIDMixin, TimestampMixin):
 
 class Product(Base, UUIDMixin, TimestampMixin):
     """Sellable product. Money is `Numeric(10, 2)` — never `Float` for prices."""
+
+    __table_args__ = (
+        # Storefront listing: WHERE is_active ORDER BY created_at DESC LIMIT n
+        Index("ix_product_active_created", "is_active", "created_at"),
+    )
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(280), nullable=False, unique=True, index=True)

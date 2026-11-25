@@ -48,18 +48,36 @@ def _to_async_url(raw: str) -> str:
 _DB_URL = _to_async_url(str(_settings.DATABASE_URL))
 
 
+def _connect_args() -> dict:
+    if not _DB_URL.startswith("postgresql+asyncpg://"):
+        return {}
+    # command_timeout is enforced by the asyncpg client, so it works through
+    # Neon's pooler (which rejects server-side startup parameters).
+    args: dict = {"command_timeout": _settings.DB_COMMAND_TIMEOUT_SECONDS}
+    if _settings.DATABASE_SSL:
+        args["ssl"] = True
+    return args
+
+
 engine = create_async_engine(
     _DB_URL,
-    connect_args={"ssl": True} if _settings.DATABASE_SSL else {},
+    connect_args=_connect_args(),
     # Echo SQL only in debug mode — too chatty otherwise.
     echo=_settings.LOG_LEVEL == "DEBUG",
-    # Pool tuning: defaults are fine for portfolio scale. For prod, tune
-    # based on observed concurrent requests vs DB capacity.
     pool_pre_ping=True,
+    # Serverless: no pool (each invocation is short-lived; Neon's pooler does
+    # the pooling). Long-running servers: a small pool per replica. Keep
+    # replicas x (DB_POOL_SIZE + DB_MAX_OVERFLOW) under the database's
+    # connection limit, and fail fast (503) instead of queueing forever.
     **(
         {"poolclass": NullPool}
         if _settings.DB_POOL_DISABLED
-        else {"pool_size": 10, "max_overflow": 20, "pool_recycle": 1800}
+        else {
+            "pool_size": _settings.DB_POOL_SIZE,
+            "max_overflow": _settings.DB_MAX_OVERFLOW,
+            "pool_timeout": _settings.DB_POOL_TIMEOUT_SECONDS,
+            "pool_recycle": 1800,
+        }
     ),
 )
 

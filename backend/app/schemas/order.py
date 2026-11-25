@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -68,6 +69,8 @@ class OrderOut(BaseModel):
     notes: str | None = None
     created_at: str
     paid_at: str | None = None
+    amount_refunded: Decimal = Decimal("0.00")
+    dispute_status: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -88,6 +91,12 @@ class CreateOrderResponse(BaseModel):
 
 class CheckoutSessionResponse(BaseModel):
     checkout_url: str
+
+
+class RefundRequest(BaseModel):
+    # Omit for a full refund of whatever has not been refunded yet.
+    amount: Decimal | None = Field(default=None, gt=0, max_digits=10, decimal_places=2)
+    reason: Literal["duplicate", "fraudulent", "requested_by_customer"] | None = None
 
 
 class PaymentConfigOut(BaseModel):
