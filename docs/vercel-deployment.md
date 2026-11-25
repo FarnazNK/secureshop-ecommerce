@@ -48,15 +48,16 @@ Only retire Render after the replacement passes these checks.
 Without `STRIPE_SECRET_KEY` the storefront shows the demo checkout. To take
 test payments:
 
-1. Apply migrations first (`0003_stripe_checkout` adds the order columns the new
-   code reads). Use the manual **database migrations** workflow in GitHub
+1. Apply migrations first (`0003_stripe_checkout` and
+   `0004_production_hardening` add the columns and tables the new code reads). Use the manual **database migrations** workflow in GitHub
    Actions with the `PROD_DATABASE_URL` repository secret, or run
    `alembic upgrade head` from a trusted machine.
 2. In the Stripe dashboard (test mode), copy the **secret key** (`sk_test_...`).
 3. Add a webhook endpoint: `https://<api-host>/api/v1/payments/webhook`, events
    `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
-   `checkout.session.async_payment_failed`, `checkout.session.expired`.
-   Copy its **signing secret** (`whsec_...`).
+   `checkout.session.async_payment_failed`, `checkout.session.expired`,
+   `charge.refunded`, `charge.dispute.created`, `charge.dispute.updated`,
+   `charge.dispute.closed`. Copy its **signing secret** (`whsec_...`).
 4. Set on the API project: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
    (both as sensitive), and optionally `STRIPE_CURRENCY` (default `usd`).
    Redeploy the API.
@@ -64,3 +65,35 @@ test payments:
    show **Paid**, and the webhook's delivery log in Stripe should show `200`.
 
 Never use live keys for this portfolio demo.
+
+## Payment safety net (free)
+
+`.github/workflows/payments-maintenance.yml` runs on GitHub Actions (free for a
+public repository):
+
+- **Hourly:** retries webhook events that failed to process, and resolves orders
+  stuck in Pending because a webhook never arrived (asks Stripe directly).
+- **Daily:** reconciles the last 48 hours of Stripe payments against the
+  database. The run fails (and GitHub emails you) if anything needs a person:
+  money taken with no order, or an order marked paid that Stripe doesn't know.
+
+It needs two repository secrets: `PROD_DATABASE_URL` (already used by the
+migrations workflow) and `STRIPE_SECRET_KEY` (the same `sk_test_...` key). Until
+both exist, runs skip without failing. The job refuses anything except a
+`sk_test_` key. It runs hourly rather than more often so Neon's free compute
+can stay asleep between runs.
+
+## Scaling settings (all optional)
+
+| Variable | Default | When to change |
+| --- | --- | --- |
+| `RATE_LIMIT_BACKEND` | `memory` | Set `database` on Vercel: serverless instances don't share memory, so only a database counter limits requests correctly. Costs one small write per request on the existing Neon database. |
+| `DB_POOL_DISABLED` | `false` | Keep `true` on Vercel (see above). |
+| `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | 5 / 5 | Long-running servers only. Keep replicas × (size + overflow) under the database's connection limit. |
+| `DB_POOL_TIMEOUT_SECONDS` | 5 | How long a request waits for a free connection before getting a 503 "server busy". |
+| `DB_COMMAND_TIMEOUT_SECONDS` | 15 | Longest a single query may run. |
+| `STRIPE_TIMEOUT_SECONDS` | 10 | Longest a single Stripe call may take before it counts as a failure. |
+
+Product list and product pages send `Cache-Control: s-maxage=30`, so Vercel's
+edge cache answers repeat browsing without running the function or waking the
+database. That keeps usage inside the free plan for longer.
