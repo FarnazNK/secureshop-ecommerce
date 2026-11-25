@@ -1,8 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { api, isApiError } from '../utils/api';
-import { fetchPaymentConfig, goToStripe, PaymentConfig, TEST_CARD } from '../utils/payments';
+import {
+  checkoutErrorMessage,
+  fetchPaymentConfig,
+  goToStripe,
+  newIdempotencyKey,
+  PaymentConfig,
+  TEST_CARD,
+} from '../utils/payments';
 
 interface CreateOrderResponse {
   order: {
@@ -18,6 +25,9 @@ export function CheckoutPage() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [payment, setPayment] = useState<PaymentConfig | null>(null);
+  // One key per checkout attempt. A retry after a timeout or a double click
+  // reuses it, so the server returns the same order instead of a second one.
+  const idempotencyKey = useRef<string>(newIdempotencyKey());
 
   useEffect(() => {
     fetchPaymentConfig().then(setPayment);
@@ -41,9 +51,11 @@ export function CheckoutPage() {
     setError(null);
 
     try {
-      const response = await api.post<CreateOrderResponse>('/orders', {
-        notes: payment?.enabled ? null : 'Portfolio demo checkout',
-      });
+      const response = await api.post<CreateOrderResponse>(
+        '/orders',
+        { notes: payment?.enabled ? null : 'Portfolio demo checkout' },
+        { headers: { 'Idempotency-Key': idempotencyKey.current } },
+      );
       if (response.data.checkout_url) {
         // Card details are entered on Stripe's page, never on this site.
         goToStripe(response.data.checkout_url);
@@ -52,7 +64,12 @@ export function CheckoutPage() {
       await refreshCart();
       navigate(`/orders/${response.data.order.id}?success=true`);
     } catch (err) {
-      setError(isApiError(err) ? err.message : 'Failed to place order');
+      if (isApiError(err) && err.status === 409) {
+        // Out of stock: nothing was ordered, so the next attempt is a new order.
+        idempotencyKey.current = newIdempotencyKey();
+        await refreshCart();
+      }
+      setError(checkoutErrorMessage(err));
       setProcessing(false);
     }
   };

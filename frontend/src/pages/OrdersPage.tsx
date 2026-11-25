@@ -26,6 +26,8 @@ interface BackendOrder {
   notes?: string | null;
   created_at: string;
   paid_at?: string | null;
+  amount_refunded?: string | number;
+  dispute_status?: string | null;
 }
 
 interface OrderItem {
@@ -50,6 +52,8 @@ interface Order {
   notes?: string | null;
   createdAt: string;
   paidAt?: string | null;
+  amountRefunded: number;
+  disputeStatus?: string | null;
 }
 
 type PaymentNotice = 'confirming' | 'paid' | 'processing' | 'cancelled' | null;
@@ -78,6 +82,8 @@ function mapOrder(order: BackendOrder): Order {
     notes: order.notes,
     createdAt: order.created_at,
     paidAt: order.paid_at,
+    amountRefunded: Number(order.amount_refunded ?? 0),
+    disputeStatus: order.dispute_status,
   };
 }
 
@@ -169,6 +175,8 @@ export function OrdersPage() {
         return 'bg-green-100 text-green-800';
       case 'cancelled':
         return 'bg-red-100 text-red-800';
+      case 'refunded':
+        return 'bg-ink-100 text-ink-700';
       default:
         return 'bg-ink-100 text-ink-800';
     }
@@ -341,7 +349,22 @@ export function OrdersPage() {
                     <span>Total</span>
                     <span>{formatPrice(selectedOrder.total)}</span>
                   </div>
+                  {selectedOrder.amountRefunded > 0 && (
+                    <div className="flex justify-between text-ink-600">
+                      <span>Refunded</span>
+                      <span>−{formatPrice(selectedOrder.amountRefunded)}</span>
+                    </div>
+                  )}
                 </div>
+                {selectedOrder.disputeStatus && (
+                  <p className="mt-4 text-sm text-amber-800">
+                    {selectedOrder.disputeStatus === 'won'
+                      ? 'A dispute on this payment was resolved in the shop’s favour.'
+                      : selectedOrder.disputeStatus === 'lost'
+                        ? 'This payment was disputed and returned to the card holder.'
+                        : 'This payment is being disputed with the card issuer.'}
+                  </p>
+                )}
                 {selectedOrder.notes && (
                   <p className="mt-4 text-sm text-ink-500">{selectedOrder.notes}</p>
                 )}
