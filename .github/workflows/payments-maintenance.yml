@@ -1,0 +1,91 @@
+name: payments maintenance
+
+# Free safety net for the Stripe webhook (GitHub Actions is free for public repos):
+#   hourly  - resolve orders stuck in PENDING (lost webhooks) and retry failed events
+#   daily   - reconcile Stripe's completed payments against the database
+# Hourly (not more often) so the free Neon database can stay suspended most of the time.
+#
+# Needs two repository secrets (Settings -> Secrets and variables -> Actions):
+#   PROD_DATABASE_URL   Neon connection string (same as the API's DATABASE_URL)
+#   STRIPE_SECRET_KEY   the same sk_test_... key the API uses
+# Until they exist, runs skip cleanly instead of failing.
+on:
+  schedule:
+    - cron: "17 * * * *"   # hourly
+    - cron: "43 7 * * *"   # daily reconciliation
+  workflow_dispatch:
+    inputs:
+      command:
+        description: Which job to run
+        type: choice
+        options: [all, expire-stale, retry-events, reconcile]
+        default: all
+
+concurrency:
+  group: payments-maintenance
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ./backend
+    env:
+      DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      DATABASE_SSL: "true"
+      DB_POOL_DISABLED: "true"
+      # Required by Settings at import time; these jobs don't use them.
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: maintenance-runner-placeholder-secret-32chars
+      JWT_REFRESH_SECRET: maintenance-runner-placeholder-secret-32chars-b
+      ENCRYPTION_KEY: maintenance-runner-placeholder-key-32-characters
+      NODE_ENV: test
+    steps:
+      - name: Check secrets
+        id: secrets
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$STRIPE_SECRET_KEY" ]; then
+            echo "::notice::PROD_DATABASE_URL / STRIPE_SECRET_KEY not set yet; skipping."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          elif [ "${STRIPE_SECRET_KEY#sk_test_}" = "$STRIPE_SECRET_KEY" ]; then
+            echo "::error::STRIPE_SECRET_KEY must be a test-mode key (sk_test_...)."
+            exit 1
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v5
+        if: steps.secrets.outputs.ready == 'true'
+
+      - uses: actions/setup-python@v6
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        if: steps.secrets.outputs.ready == 'true'
+        run: pip install -e .
+
+      - name: Run
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            cmd="${{ github.event.inputs.command }}"
+          elif [ "${{ github.event.schedule }}" = "43 7 * * *" ]; then
+            cmd="reconcile"
+          else
+            cmd="all-but-reconcile"
+          fi
+          if [ "$cmd" = "all-but-reconcile" ]; then
+            python -m app.jobs.payments retry-events
+            python -m app.jobs.payments expire-stale
+          else
+            python -m app.jobs.payments "$cmd"
+          fi

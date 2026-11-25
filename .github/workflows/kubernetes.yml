@@ -22,3 +22,15 @@ jobs:
         run: |
           python k8s/validate.py
           python k8s/validate_monitoring.py
+      - name: Check Prometheus config and alert rules with promtool
+        run: |
+          mkdir -p /tmp/prom
+          python - <<'PY'
+          import yaml
+          docs = yaml.safe_load_all(open("k8s/monitoring.yaml"))
+          cfg = next(d for d in docs if d["metadata"]["name"] == "prometheus-config")["data"]
+          for name, body in cfg.items():
+              open(f"/tmp/prom/{name}", "w").write(body)
+          PY
+          docker run --rm -v /tmp/prom:/etc/prometheus:ro --entrypoint promtool \
+            prom/prometheus:v2.55.1 check config /etc/prometheus/prometheus.yml

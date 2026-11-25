@@ -1,0 +1,52 @@
+# Local-only autoscaling add-on. Apply after k8s/local.yaml, in the same namespace.
+# Needs metrics-server (free, runs in the cluster):
+#   kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+#   (kind also needs: kubectl -n kube-system patch deployment metrics-server --type=json
+#    -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]')
+#
+# With more than one backend pod the rate limiter must be shared:
+# k8s/local.yaml already sets RATE_LIMIT_BACKEND=database.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 2
+  # 4 pods x (DB_POOL_SIZE 5 + DB_MAX_OVERFLOW 5) = 40 connections,
+  # well under PostgreSQL's default max_connections of 100.
+  maxReplicas: 4
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+---
+# Keep at least one backend pod serving during node drains and rolling updates.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: backend

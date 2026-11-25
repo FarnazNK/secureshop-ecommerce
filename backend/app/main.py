@@ -8,7 +8,6 @@ handler. Returns an ASGI app that uvicorn can serve.
 from __future__ import annotations
 
 import time
-from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -17,11 +16,13 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
 
 from app.api.v1 import api_router
 from app.api_reference import render_api_reference
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
+from app.core.rate_limit import RATE_LIMITED, build_rate_limiter
 from app.middleware.request_logging import RequestLoggingMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 
@@ -30,9 +31,11 @@ METRIC_REQUESTS = Counter(
 )
 METRIC_DURATION = Histogram("secureshop_http_duration_seconds", "HTTP latency", ["method", "route"])
 
-log = get_logger(__name__)
+DB_POOL_EXHAUSTED = Counter(
+    "secureshop_db_pool_exhausted_total", "Requests shed (503) because no DB connection was free"
+)
 
-_rate_windows: dict[str, deque[float]] = defaultdict(deque)
+log = get_logger(__name__)
 
 
 def _client_ip(request: Request) -> str:
@@ -70,11 +73,16 @@ def create_app() -> FastAPI:
     )
 
     # --- Rate limiting ---
-    # Process-local is sufficient for the single-instance portfolio deployment.
-    # Move this state to Redis before running multiple API instances.
+    # RATE_LIMIT_BACKEND=memory counts per process; =database shares the count
+    # across every instance through the existing Postgres (see core/rate_limit).
+    app.state.rate_limiter = build_rate_limiter(settings.RATE_LIMIT_BACKEND)
+
     @app.middleware("http")
     async def rate_limit_middleware(request: Request, call_next):
-        now = time.monotonic()
+        # Stripe webhooks are authenticated by signature and retried by Stripe;
+        # rate limiting them by IP would only drop real payment events.
+        if request.url.path == "/api/v1/payments/webhook":
+            return await call_next(request)
         auth_path = request.url.path in {
             "/api/v1/auth/login",
             "/api/v1/auth/register",
@@ -90,13 +98,12 @@ def create_app() -> FastAPI:
             bucket = "api"
 
         key = f"{bucket}:{_client_ip(request)}"
-        events = _rate_windows[key]
-        while events and now - events[0] >= window_seconds:
-            events.popleft()
-        if len(events) >= limit:
-            retry_after = int(window_seconds - (now - events[0])) if events else window_seconds
-            return _rate_limit_response(retry_after)
-        events.append(now)
+        decision = await request.app.state.rate_limiter.hit(
+            key, limit, window_seconds, fail_open=not auth_path
+        )
+        if not decision.allowed:
+            RATE_LIMITED.labels(bucket).inc()
+            return _rate_limit_response(decision.retry_after)
         return await call_next(request)
 
     @app.middleware("http")
@@ -120,8 +127,8 @@ def create_app() -> FastAPI:
         allow_origins=settings.allowed_origins_list,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
-        expose_headers=["X-Request-ID"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Idempotency-Key"],
+        expose_headers=["X-Request-ID", "Retry-After"],
         max_age=600,
     )
 
@@ -154,6 +161,21 @@ def create_app() -> FastAPI:
     @app.get("/api/reference", response_class=HTMLResponse, include_in_schema=False)
     async def api_reference() -> HTMLResponse:
         return HTMLResponse(render_api_reference(app.openapi()))
+
+    # --- Overload: no free database connection within DB_POOL_TIMEOUT_SECONDS ---
+    # Shed load with a retryable 503 instead of a 500, so clients and load
+    # balancers back off rather than treating it as a bug.
+    @app.exception_handler(SQLAlchemyTimeoutError)
+    async def _pool_exhausted_handler(
+        request: Request, exc: SQLAlchemyTimeoutError
+    ) -> JSONResponse:
+        DB_POOL_EXHAUSTED.inc()
+        log.warning("db.pool_exhausted", path=request.url.path)
+        return JSONResponse(
+            status_code=503,
+            content={"error": "server busy, please retry"},
+            headers={"Retry-After": "2"},
+        )
 
     # --- Global exception handler ---
     @app.exception_handler(Exception)
