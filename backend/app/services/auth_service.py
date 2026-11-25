@@ -106,13 +106,17 @@ async def authenticate(
     target_hash = user.password_hash if user else dummy_hash
     password_ok = verify_password(password, target_hash)
 
+    # Check lockout before branching on password validity. Keep the bcrypt
+    # verification above to avoid introducing a password-timing oracle.
+    # Locked accounts must not accumulate more failed attempts or extend
+    # their lockout window.
+    if user is not None and user.is_locked:
+        raise AuthError("account temporarily locked", code="account_locked")
+
     if user is None or not password_ok or not user.is_active:
         if user is not None and not password_ok:
             await _record_failed_attempt(db, user)
         raise AuthError("invalid credentials", code="invalid_credentials")
-
-    if user.is_locked:
-        raise AuthError("account temporarily locked", code="account_locked")
 
     # Successful login — reset counters, update last_login.
     user.failed_login_attempts = 0
