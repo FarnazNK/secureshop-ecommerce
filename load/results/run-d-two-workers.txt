@@ -1,0 +1,71 @@
+time="2026-11-24T19:42:00-06:00" level=warning msg="Insufficient VUs, reached 60 active VUs and cannot initialize more" executor=constant-arrival-rate scenario=browse
+
+
+  █ THRESHOLDS 
+
+    checks
+    ✓ 'rate>0.99' rate=100.00%
+
+    http_req_duration{scenario:browse}
+    ✗ 'p(95)<500' p(95)=1.01s
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+
+    idempotency_mismatch
+    ✓ 'count==0' count=0
+
+    limited_sold
+    ✓ 'count==50' count=50
+
+    limited_stock_after
+    ✓ 'value==0' value=0
+
+    order_create_ms
+    ✓ 'p(95)<1500' p(95)=1.26s
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 29583   180.049082/s
+    checks_succeeded...: 100.00% 29583 out of 29583
+    checks_failed......: 0.00%   0 out of 29583
+
+    ✓ list 200
+    ✓ product 200
+    ✓ cart 201
+    ✓ order 201
+    ✓ retry returns the same order
+    ✓ flash cart 201
+    ✓ flash order 201 or sold out 409
+
+    CUSTOM
+    idempotency_mismatch...........: 0      0/s
+    idempotent_replays.............: 815    4.960281/s
+    limited_sold...................: 50     0.304312/s
+    limited_sold_out...............: 150    0.912935/s
+    limited_stock_after............: 0      min=0          max=0  
+    order_create_ms................: avg=557.56ms min=65.42ms med=467.78ms max=3.72s p(90)=1.02s    p(95)=1.26s
+
+    HTTP
+    http_req_duration..............: avg=480.12ms min=5.14ms  med=395.48ms max=5s    p(90)=888.19ms p(95)=1.11s
+      { expected_response:true }...: avg=480.12ms min=5.14ms  med=395.48ms max=5s    p(90)=888.19ms p(95)=1.11s
+      { scenario:browse }..........: avg=437.55ms min=16.6ms  med=359.69ms max=5s    p(90)=816.9ms  p(95)=1.01s
+    http_req_failed................: 0.00%  0 out of 29934
+    http_reqs......................: 29934  182.18535/s
+
+    EXECUTION
+    dropped_iterations.............: 12358  75.213689/s
+    iteration_duration.............: avg=991ms    min=65.29ms med=868.18ms max=5.68s p(90)=1.68s    p(95)=2.04s
+    iterations.....................: 14434  87.848712/s
+    vus............................: 60     min=0          max=299
+    vus_max........................: 300    min=260        max=300
+
+    NETWORK
+    data_received..................: 83 MB  507 kB/s
+    data_sent......................: 7.0 MB 43 kB/s
+
+
+
+time="2026-11-24T19:44:29-06:00" level=error msg="thresholds on metrics 'http_req_duration{scenario:browse}' have been crossed"
+exit=99

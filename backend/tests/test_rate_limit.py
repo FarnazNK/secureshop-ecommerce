@@ -77,6 +77,15 @@ async def test_database_errors_fail_open() -> None:
     assert (await limiter.hit("ip", 1, 60)).allowed
 
 
+async def test_auth_requests_fail_closed_when_the_database_is_down() -> None:
+    def broken_sessions():
+        raise ConnectionError("database unreachable")
+
+    limiter = DatabaseRateLimiter(broken_sessions)  # type: ignore[arg-type]
+    blocked = await limiter.hit("auth:ip", 5, 900, fail_open=False)
+    assert not blocked.allowed and blocked.retry_after == 5
+
+
 async def test_prune_removes_only_old_windows(sessions: async_sessionmaker[AsyncSession]) -> None:
     async with sessions() as db:
         db.add_all(

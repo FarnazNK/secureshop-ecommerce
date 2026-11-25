@@ -32,6 +32,8 @@ def upgrade() -> None:
     op.create_index("ix_order_user_created", "order", ["user_id", "created_at"])
     op.create_index("ix_order_status_created", "order", ["status", "created_at"])
     op.create_index("ix_order_stripe_payment_intent_id", "order", ["stripe_payment_intent_id"])
+    # Storefront listing: WHERE is_active ORDER BY created_at DESC LIMIT n
+    op.create_index("ix_product_active_created", "product", ["is_active", "created_at"])
 
     op.create_table(
         "stripe_event",
@@ -65,6 +67,7 @@ def downgrade() -> None:
     op.drop_table("rate_limit_bucket")
     op.drop_index("ix_stripe_event_status_received", table_name="stripe_event")
     op.drop_table("stripe_event")
+    op.drop_index("ix_product_active_created", table_name="product")
     op.drop_index("ix_order_stripe_payment_intent_id", table_name="order")
     op.drop_index("ix_order_status_created", table_name="order")
     op.drop_index("ix_order_user_created", table_name="order")

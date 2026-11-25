@@ -16,6 +16,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
 
 from app.api.v1 import api_router
 from app.api_reference import render_api_reference
@@ -29,6 +30,10 @@ METRIC_REQUESTS = Counter(
     "secureshop_http_requests_total", "HTTP requests", ["method", "route", "status"]
 )
 METRIC_DURATION = Histogram("secureshop_http_duration_seconds", "HTTP latency", ["method", "route"])
+
+DB_POOL_EXHAUSTED = Counter(
+    "secureshop_db_pool_exhausted_total", "Requests shed (503) because no DB connection was free"
+)
 
 log = get_logger(__name__)
 
@@ -93,7 +98,9 @@ def create_app() -> FastAPI:
             bucket = "api"
 
         key = f"{bucket}:{_client_ip(request)}"
-        decision = await request.app.state.rate_limiter.hit(key, limit, window_seconds)
+        decision = await request.app.state.rate_limiter.hit(
+            key, limit, window_seconds, fail_open=not auth_path
+        )
         if not decision.allowed:
             RATE_LIMITED.labels(bucket).inc()
             return _rate_limit_response(decision.retry_after)
@@ -154,6 +161,21 @@ def create_app() -> FastAPI:
     @app.get("/api/reference", response_class=HTMLResponse, include_in_schema=False)
     async def api_reference() -> HTMLResponse:
         return HTMLResponse(render_api_reference(app.openapi()))
+
+    # --- Overload: no free database connection within DB_POOL_TIMEOUT_SECONDS ---
+    # Shed load with a retryable 503 instead of a 500, so clients and load
+    # balancers back off rather than treating it as a bug.
+    @app.exception_handler(SQLAlchemyTimeoutError)
+    async def _pool_exhausted_handler(
+        request: Request, exc: SQLAlchemyTimeoutError
+    ) -> JSONResponse:
+        DB_POOL_EXHAUSTED.inc()
+        log.warning("db.pool_exhausted", path=request.url.path)
+        return JSONResponse(
+            status_code=503,
+            content={"error": "server busy, please retry"},
+            headers={"Retry-After": "2"},
+        )
 
     # --- Global exception handler ---
     @app.exception_handler(Exception)

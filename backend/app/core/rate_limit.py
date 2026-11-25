@@ -7,9 +7,11 @@ database  Fixed-window counters in the existing Postgres (`rate_limit_bucket`),
           no extra service needed.
 
 Both answer the same question: may this key make another request now, and if
-not, how many seconds until it may? The database backend fails open: if the
-database is slow or down, requests are allowed (and counted in a metric)
-rather than locking every user out because of the limiter.
+not, how many seconds until it may? When the database is slow or down the
+database backend fails open for ordinary requests (allowed, and counted in a
+metric) rather than locking every user out because of the limiter. Auth
+requests fail closed instead: login needs the database anyway, and an
+overload must not switch off brute-force protection.
 """
 
 from __future__ import annotations
@@ -48,7 +50,9 @@ class MemoryRateLimiter:
         self._clock = clock
         self._windows: dict[str, deque[float]] = defaultdict(deque)
 
-    async def hit(self, key: str, limit: int, window_seconds: int) -> Decision:
+    async def hit(
+        self, key: str, limit: int, window_seconds: int, *, fail_open: bool = True
+    ) -> Decision:
         now = self._clock()
         events = self._windows[key]
         while events and now - events[0] >= window_seconds:
@@ -105,17 +109,19 @@ class DatabaseRateLimiter:
             await db.commit()
             return count
 
-    async def hit(self, key: str, limit: int, window_seconds: int) -> Decision:
+    async def hit(
+        self, key: str, limit: int, window_seconds: int, *, fail_open: bool = True
+    ) -> Decision:
         now = self._clock()
         window_start = int(now // window_seconds * window_seconds)
         try:
             count = await asyncio.wait_for(
                 self._count(self._storage_key(key), window_start), self._timeout
             )
-        except Exception as exc:
+        except Exception as exc:  # any backend problem
             RATE_LIMIT_ERRORS.inc()
-            log.warning("rate_limit.backend_error", error=type(exc).__name__)
-            return Decision(True)
+            log.warning("rate_limit.backend_error", error=type(exc).__name__, fail_open=fail_open)
+            return Decision(True) if fail_open else Decision(False, 5)
         if count > limit:
             return Decision(False, max(1, int(window_start + window_seconds - now)))
         return Decision(True)
