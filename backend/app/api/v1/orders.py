@@ -23,19 +23,20 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_role
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.db.session import get_db
 from app.models.cart import Cart, CartItem
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.product import Product
-from app.models.user import User
+from app.models.user import Role, User
 from app.schemas.order import (
     CheckoutSessionResponse,
     CreateOrderRequest,
     CreateOrderResponse,
     OrderOut,
+    RefundRequest,
 )
 from app.services import payments
 
@@ -76,6 +77,8 @@ def _to_order_out(order: Order) -> OrderOut:
         notes=order.notes,
         created_at=order.created_at.isoformat(),
         paid_at=order.paid_at.isoformat() if order.paid_at else None,
+        amount_refunded=order.amount_refunded or Decimal("0.00"),
+        dispute_status=order.dispute_status,
     )
 
 
@@ -384,4 +387,53 @@ async def sync_order_payment(
         if outcome in {"paid", "cancelled"}:
             await db.commit()
             await db.refresh(order, ["items"])
+    return _to_order_out(order)
+
+
+@router.post(
+    "/{order_id}/refund",
+    response_model=OrderOut,
+    summary="Refund a paid order in full or in part (admin)",
+)
+async def refund_order(
+    order_id: str,
+    payload: RefundRequest,
+    _admin: Annotated[User, Depends(require_role(Role.ADMIN))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> OrderOut:
+    """Creates the refund in Stripe. The order's refunded amount is set from
+    Stripe's answer now and kept authoritative by the `charge.refunded`
+    webhook (which also covers refunds made in the Stripe dashboard)."""
+    settings = get_settings()
+    if not payments.payments_enabled(settings):
+        raise HTTPException(503, detail="payments are not configured")
+    try:
+        oid = uuid.UUID(order_id)
+    except ValueError as exc:
+        raise HTTPException(400, detail="invalid order_id") from exc
+    order = await payments.load_order_for_payment(db, oid)
+    if order is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="order not found")
+    if order.status not in payments.REFUNDABLE or not order.stripe_payment_intent_id:
+        raise HTTPException(409, detail=f"order is {order.status.value}; nothing to refund")
+
+    remaining = order.total - order.amount_refunded
+    amount = payload.amount if payload.amount is not None else remaining
+    if amount <= 0 or amount > remaining:
+        raise HTTPException(422, detail=f"refund must be between 0.01 and {remaining}")
+
+    try:
+        refund = await payments.create_refund(
+            settings, order, amount_cents=payments.to_minor_units(amount), reason=payload.reason
+        )
+    except payments.PaymentError as exc:
+        raise _payment_http_error(exc) from exc
+
+    if payments.field(refund, "status") in {"succeeded", "pending"}:
+        order.amount_refunded += amount
+        if order.amount_refunded >= order.total:
+            order.status = OrderStatus.REFUNDED
+    await db.commit()
+    await db.refresh(order, ["items"])
+    log.info("order.refunded", order_id=str(order.id), amount=str(amount))
     return _to_order_out(order)

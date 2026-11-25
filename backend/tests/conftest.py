@@ -32,3 +32,7 @@ def event_loop() -> Iterator[asyncio.AbstractEventLoop]:
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
+
+
+# Payment fixtures (Stripe fakes, SQLite sessions, signed webhooks) for all tests.
+pytest_plugins = ["tests.payment_fixtures"]

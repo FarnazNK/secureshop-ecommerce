@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -304,3 +305,144 @@ async def apply_checkout_session(
         return "cancelled"
 
     return "pending"
+
+
+# ---------------------------------------------------------------------------
+# Refunds and disputes
+# ---------------------------------------------------------------------------
+REFUND_EVENTS = {"charge.refunded"}
+DISPUTE_EVENTS = {"charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed"}
+HANDLED_EVENTS = PAID_EVENTS | FAILED_EVENTS | REFUND_EVENTS | DISPUTE_EVENTS
+REFUNDABLE = {OrderStatus.PAID, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED}
+
+PAYMENT_OUTCOMES = Counter(
+    "secureshop_payment_events_total",
+    "Processed Stripe events by type and outcome",
+    ["type", "outcome"],
+)
+WEBHOOK_LAG = Histogram(
+    "secureshop_webhook_lag_seconds",
+    "Time from Stripe creating an event to us processing it",
+    buckets=(1, 5, 15, 60, 300, 900, 3600, 21600, 86400),
+)
+
+
+def from_minor_units(cents: int) -> Decimal:
+    return (Decimal(cents) / 100).quantize(Decimal("0.01"))
+
+
+async def load_order_by_payment_intent(db: AsyncSession, intent_id: str) -> Order | None:
+    return await db.scalar(
+        select(Order).where(Order.stripe_payment_intent_id == intent_id).with_for_update()
+    )
+
+
+def apply_refund(order: Order, charge: Any) -> str:
+    """Mirror Stripe's refunded amount onto the order (absolute value, so
+    replays and out-of-order events converge on the same state)."""
+    refunded = from_minor_units(int(field(charge, "amount_refunded") or 0))
+    if refunded <= order.amount_refunded and order.status == OrderStatus.REFUNDED:
+        return "already_refunded"
+    order.amount_refunded = refunded
+    if field(charge, "refunded") or refunded >= order.total:
+        order.status = OrderStatus.REFUNDED
+        return "refunded"
+    return "partially_refunded"
+
+
+def apply_dispute(order: Order, dispute: Any) -> str:
+    status = str(field(dispute, "status") or "unknown")
+    order.dispute_status = status
+    if status == "lost":
+        log.error("payment.dispute_lost", order_id=str(order.id))
+    else:
+        log.warning("payment.dispute", order_id=str(order.id), status=status)
+    return f"dispute_{status}"
+
+
+async def create_refund(
+    settings: Settings,
+    order: Order,
+    *,
+    amount_cents: int,
+    reason: str | None,
+) -> Any:
+    """Refund through Stripe. The key includes what was already refunded, so a
+    retried click can't refund twice but a later second partial refund can."""
+    already = to_minor_units(order.amount_refunded)
+    params: dict[str, Any] = {
+        "payment_intent": order.stripe_payment_intent_id,
+        "amount": amount_cents,
+        "metadata": {"order_id": str(order.id), "order_number": order.order_number},
+        "idempotency_key": f"refund-{order.id}-{already}-{amount_cents}",
+    }
+    if reason:
+        params["reason"] = reason
+    return await _stripe_call(settings, stripe.Refund.create, **params)
+
+
+# ---------------------------------------------------------------------------
+# One entry point for every handled event (webhook, retry job, reconciliation)
+# ---------------------------------------------------------------------------
+async def process_event(db: AsyncSession, settings: Settings, event: dict[str, Any]) -> str:
+    """Apply a verified Stripe event. Idempotent; the caller commits."""
+    event_type = str(event.get("type"))
+    obj = (event.get("data") or {}).get("object") or {}
+    created = event.get("created")
+    if isinstance(created, int):
+        WEBHOOK_LAG.observe(max(0.0, datetime.now(UTC).timestamp() - created))
+
+    if event_type in PAID_EVENTS | FAILED_EVENTS:
+        reference = field(obj, "client_reference_id")
+        try:
+            order_id = uuid.UUID(str(reference))
+        except ValueError:
+            outcome = "ignored_unknown_reference"
+        else:
+            order = await load_order_for_payment(db, order_id)
+            outcome = (
+                "ignored_order_not_found"
+                if order is None
+                else await apply_checkout_session(
+                    db, order, obj, settings=settings, event_type=event_type
+                )
+            )
+    elif event_type in REFUND_EVENTS | DISPUTE_EVENTS:
+        intent = field(obj, "payment_intent")
+        order = await load_order_by_payment_intent(db, str(intent)) if intent else None
+        if order is None:
+            outcome = "ignored_order_not_found"
+        elif event_type in REFUND_EVENTS:
+            outcome = apply_refund(order, obj)
+        else:
+            outcome = apply_dispute(order, obj)
+    else:
+        outcome = "ignored_type"
+    PAYMENT_OUTCOMES.labels(event_type, outcome).inc()
+    return outcome
+
+
+async def process_stored_event(db: AsyncSession, record: Any, settings: Settings) -> str:
+    """Process one stored `StripeEvent` and record the result. Never raises:
+    a failure is saved on the row for the scheduled retry job."""
+    event_id = record.id
+    try:
+        outcome = await process_event(db, settings, record.payload)
+    except Exception as exc:
+        await db.rollback()
+        failed = await db.get(type(record), event_id)
+        if failed is not None:
+            failed.status = "failed"
+            failed.attempts += 1
+            failed.last_error = f"{type(exc).__name__}: {exc}"[:2000]
+            await db.commit()
+        log.error("stripe.webhook_processing_failed", event_id=event_id, error=str(exc))
+        return "failed_will_retry"
+    record.status = "ignored" if outcome.startswith("ignored") else "processed"
+    record.outcome = outcome
+    record.attempts += 1
+    record.last_error = None
+    record.processed_at = datetime.now(UTC)
+    await db.commit()
+    log.info("stripe.webhook_handled", event_id=event_id, event_type=record.type, outcome=outcome)
+    return outcome
