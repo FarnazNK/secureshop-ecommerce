@@ -49,6 +49,7 @@ jobs:
     steps:
       - name: Check secrets
         id: secrets
+        working-directory: .
         run: |
           if [ -z "$DATABASE_URL" ] || [ -z "$STRIPE_SECRET_KEY" ]; then
             echo "::notice::PROD_DATABASE_URL / STRIPE_SECRET_KEY not set yet; skipping."
