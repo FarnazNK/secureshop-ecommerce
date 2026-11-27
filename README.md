@@ -1,6 +1,10 @@
-# SecureShop
+# SecureShop — Security-First E-Commerce with FastAPI, React & Stripe
 
-**A security-first full-stack e-commerce app.** React + TypeScript storefront and a FastAPI/PostgreSQL backend built around the OWASP Top 10: refresh-token rotation with theft detection, constant-time login, RBAC, rate limiting and safe money handling.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+An open-source full-stack e-commerce reference project with a React/TypeScript storefront, Python/FastAPI backend, PostgreSQL and Stripe test-mode checkout. Explore practical web application security patterns inspired by the OWASP Top 10, including refresh-token rotation with reuse detection, role-based access control, rate limiting, safe money handling and idempotent payment workflows.
+
+**Useful for:** developers learning secure REST API design, JWT authentication, Stripe webhook integration and concurrent order processing.
 
 [![CI](https://github.com/FarnazNK/secureshop-ecommerce/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/FarnazNK/secureshop-ecommerce/actions/workflows/ci.yml)
 [![Security](https://github.com/FarnazNK/secureshop-ecommerce/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/FarnazNK/secureshop-ecommerce/actions/workflows/security.yml)
@@ -153,3 +157,11 @@ None of these need a paid account.
 ---
 
 Built by **Farnaz Nasehi** · [LinkedIn](https://www.linkedin.com/in/farnaz-nasehi/) · [GitHub](https://github.com/FarnazNK)
+
+## License
+
+[MIT](LICENSE). Use and adapt the code under the license terms. Review security and payment configuration before using it beyond a demonstration environment.
+
+## Contributing
+
+Issues, reproducible bug reports and focused pull requests are welcome. If this project is useful to you, consider starring it so you can find it again.
